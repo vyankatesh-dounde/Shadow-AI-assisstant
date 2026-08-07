@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Shadow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ============ TOKEN GATE (shown until a valid token is stored) ============ -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <div class="gate-ring"><div class="ring-core"></div></div>
+    <h1>Shadow</h1>
+    <p class="gate-sub">Enter the access token configured in <code>config.py</code> to connect from this device.</p>
+    <input id="gate-token" type="password" placeholder="Access token" autocomplete="off" />
+    <button id="gate-connect">Connect</button>
+    <p id="gate-error" class="gate-error"></p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="presence" id="presence" data-state="idle">
+        <span class="ring r1"></span>
+        <span class="ring r2"></span>
+        <span class="core"></span>
+      </div>
+      <div class="brand-text">
+        <h1>Shadow</h1>
+        <span class="brand-sub">local network assistant</span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button id="wake-toggle" class="wake-toggle" data-state="off" title="Toggle wake-word listening">
+        <span class="wake-dot"></span>
+        <span class="wake-label">wake word: off</span>
+      </button>
+      <div class="conn" id="conn-indicator" data-state="connecting">
+        <span class="dot"></span>
+        <span class="conn-label">connecting…</span>
+      </div>
+      <nav class="tabs" id="mobile-tabs">
+        <button class="tab-btn active" data-panel="chat">Chat</button>
+        <button class="tab-btn" data-panel="status">Status</button>
+        <button class="tab-btn" data-panel="reminders">Reminders</button>
+        <button class="tab-btn" data-panel="control">Control</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- LEFT: SYSTEM STATUS + QUICK ACTIONS -->
+    <section class="panel panel-status" data-panel-name="status">
+      <div class="panel-block">
+        <h2>System</h2>
+        <div class="meter">
+          <div class="meter-label"><span>CPU</span><span id="cpu-val">–</span></div>
+          <div class="meter-track"><div class="meter-fill" id="cpu-fill"></div></div>
+        </div>
+        <div class="meter">
+          <div class="meter-label"><span>Memory</span><span id="mem-val">–</span></div>
+          <div class="meter-track"><div class="meter-fill" id="mem-fill"></div></div>
+        </div>
+        <div class="status-row">
+          <span class="status-key">Active window</span>
+          <span class="status-val" id="active-window">–</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">Battery</span>
+          <span class="status-val" id="battery-val">–</span>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <h2>Quick actions</h2>
+        <div class="action-grid">
+          <button data-action="open" data-value="chrome">Chrome</button>
+          <button data-action="open" data-value="notepad">Notepad</button>
+          <button data-action="open" data-value="explorer">Files</button>
+          <button data-action="volume_up" data-value="">Vol +</button>
+          <button data-action="volume_down" data-value="">Vol –</button>
+          <button data-action="play_pause" data-value="">Play/Pause</button>
+          <button data-action="minimize_all" data-value="">Show desktop</button>
+          <button data-action="switch_window" data-value="">Switch window</button>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <h2>Power <span class="danger-tag">confirm required</span></h2>
+        <div class="action-grid danger-grid">
+          <button class="danger" data-action="sleep_pc" data-value="">Sleep PC</button>
+          <button class="danger" data-action="restart" data-value="">Restart PC</button>
+          <button class="danger" data-action="stop_server" data-value="">Stop Server</button>
+        </div>
+        <p class="power-hint">"Stop Server" only closes this dashboard's server — it does not shut down or restart the PC.</p>
+      </div>
+
+      <div class="panel-block">
+        <h2>Custom command</h2>
+        <div class="custom-action">
+          <select id="custom-action-select">
+            <option value="open">open app…</option>
+            <option value="open_smart">find &amp; open file/folder…</option>
+            <option value="search">search google…</option>
+            <option value="close">close app…</option>
+            <option value="type_text">type text…</option>
+          </select>
+          <input id="custom-action-value" type="text" placeholder="value" />
+          <button id="custom-action-run">Run</button>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <h2>Control log</h2>
+        <ul class="log-list" id="control-log"></ul>
+      </div>
+    </section>
+
+    <!-- CENTER: CHAT -->
+    <section class="panel panel-chat" data-panel-name="chat">
+      <div class="chat-scroll" id="chat-scroll">
+        <div class="chat-empty" id="chat-empty">
+          <p>Say "Hey Shadow" or tap the mic, or just type below.</p>
+        </div>
+      </div>
+
+      <form class="composer" id="composer">
+        <button type="button" class="mic-btn" id="mic-btn" title="Voice input" aria-label="Voice input">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/>
+            <path d="M19 11a7 7 0 0 1-14 0"/>
+            <path d="M12 18v3"/>
+          </svg>
+        </button>
+        <input id="chat-input" type="text" placeholder="Message Shadow…" autocomplete="off" />
+        <button type="submit" class="send-btn" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/>
+          </svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- RIGHT: REMINDERS -->
+    <section class="panel panel-reminders" data-panel-name="reminders">
+      <div class="panel-block">
+        <h2>New reminder</h2>
+        <div class="reminder-form">
+          <input id="reminder-text" type="text" placeholder="Remind me to…" />
+          <input id="reminder-when" type="text" placeholder="in 10 minutes / at 6pm / tomorrow at 8am" />
+          <button id="reminder-add">Add reminder</button>
+          <p id="reminder-error" class="reminder-error hidden"></p>
+        </div>
+      </div>
+      <div class="panel-block">
+        <h2>Upcoming</h2>
+        <ul class="reminder-list" id="reminder-list">
+          <li class="empty-hint">No reminders yet.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<audio id="tts-audio" preload="none"></audio>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

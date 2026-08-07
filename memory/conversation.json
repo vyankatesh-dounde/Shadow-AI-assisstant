@@ -1,0 +1,50 @@
+[
+  {
+    "role": "user",
+    "content": "open e-drive"
+  },
+  {
+    "role": "assistant",
+    "content": "I couldn't find e-drive"
+  },
+  {
+    "role": "user",
+    "content": "Shadow open e-drive"
+  },
+  {
+    "role": "assistant",
+    "content": "I couldn't find shadow  e-drive"
+  },
+  {
+    "role": "user",
+    "content": "open games folder"
+  },
+  {
+    "role": "assistant",
+    "content": "That path does not exist."
+  },
+  {
+    "role": "user",
+    "content": "drink water in 10 minutes"
+  },
+  {
+    "role": "user",
+    "content": "remind me to drink water in 10 minutes"
+  },
+  {
+    "role": "assistant",
+    "content": "Done - I'll remind you to drink water on Friday 03:09 PM."
+  },
+  {
+    "role": "user",
+    "content": "remind no no just cancel it out"
+  },
+  {
+    "role": "user",
+    "content": "add a reminder to drink water in 2 minutes"
+  },
+  {
+    "role": "assistant",
+    "content": "Done - I'll remind you to drink water on Friday 03:02 PM."
+  }
+]
