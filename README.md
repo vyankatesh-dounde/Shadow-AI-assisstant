@@ -180,3 +180,4 @@ Shadow is a locally-hosted, voice-activated AI assistant you're building that ru
 "# Shadow-AI-assisstant" 
 "# Shadow-AI-assisstant" 
 "# Shadow-AI-assisstant" 
+"# Shadow-AI-assisstant" 
