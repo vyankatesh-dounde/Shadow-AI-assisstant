@@ -508,6 +508,7 @@ button, input, select {
   border-radius: var(--radius-md);
   font-size: 14.5px;
   line-height: 1.5;
+  white-space: pre-wrap;
   animation: msg-in 0.2s ease;
 }
 @keyframes msg-in {

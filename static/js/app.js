@@ -414,7 +414,7 @@
   if (SpeechRecognitionImpl) {
     recognizer = new SpeechRecognitionImpl();
     recognizer.lang = "en-US";
-    recognizer.maxAlternatives = 1;
+    recognizer.maxAlternatives = 3;
 
     // Actually configures + starts the recognizer for `mode`. Only
     // ever called from onstart/onend, never directly from onresult,
