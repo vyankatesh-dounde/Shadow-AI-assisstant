@@ -169,3 +169,4 @@ always-listening desktop process to worry about racing with it, since
 - A "who's connected" panel so you can see which devices are live
 - Per-device pairing-code auth instead of the shared-secret token, if
   you want tighter per-device control
+"# Shadow-AI-assisstant" 
