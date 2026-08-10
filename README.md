@@ -170,3 +170,4 @@ always-listening desktop process to worry about racing with it, since
 - Per-device pairing-code auth instead of the shared-secret token, if
   you want tighter per-device control
 "# Shadow-AI-assisstant" 
+"# Shadow-AI-assisstant" 
