@@ -177,3 +177,5 @@ always-listening desktop process to worry about racing with it, since
 Shadow is a locally-hosted, voice-activated AI assistant you're building that runs entirely on your own Windows PC and is accessible from any device on your home network — phone, tablet, laptop — through a browser, with no installs needed on those other devices.
 >>>>>>> 2d86bee20ac872666b1427d50322d9f9e69e35af
 "# Shadow-AI-assisstant" 
+"# Shadow-AI-assisstant" 
+"# Shadow-AI-assisstant" 
