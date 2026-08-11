@@ -1,3 +1,5 @@
+import re
+
 from ai.llm import ask_ai, FALLBACK_REPLIES
 from core.file_indexer import open_indexed, build_index
 from core.relationship import update_relationship, load_relationship
@@ -10,10 +12,11 @@ from core.desktop_control import (
 from core.skills import handle_skills
 from core.reminder_nlp import try_create_reminder
 from core.wake_word import is_wake_word, handle_wake_word
-from core.memory import add_message, load_facts, load_conversation, save_fact
+from core.memory import add_message, load_facts, load_conversation, save_fact, save_fact_list
 from core.memory_extractor import ai_extract_memory
 from integrations.memory_integration import (
     learn_from_text,
+    fact_ack,
     build_memory_context,
     get_daily_memory,
     remember_today,
@@ -184,15 +187,22 @@ async def process(text, personality):
     # =========================================================
     # 🧠 STEP 2 — LEARN FROM USER
     # Runs for every real message, whether it turns out to be a
-    # command or something that needs the LLM.
+    # command or something that needs the LLM. `changes` captures
+    # what extract_and_store() actually saved/removed (if anything) -
+    # used below, after the command router, to short-circuit plain
+    # fact statements ("I like pizza") straight to a canned reply
+    # instead of an LLM round trip.
     # =========================================================
-    learn_from_text(text)
+    changes = learn_from_text(text)
 
     if len(text.split()) >= 4:
         memory = await ai_extract_memory(text, personality)
         for k, v in memory.items():
-            if k and v:
-                save_fact(str(k), str(v))
+            if k in ("like", "dislike"):
+                save_fact_list(k, str(v))
+            else:
+                save_fact(k, str(v))
+        facts = load_facts()  # pick up anything ai_extract_memory just saved
 
     rel = update_relationship(text)
     facts = load_facts()
@@ -213,13 +223,30 @@ async def process(text, personality):
             return reply
 
     # =========================================================
+    # 📝 STEP 3.5 — QUICK FACT ACK
+    # No command matched, but Step 2 recognized a plain fact
+    # statement (like/dislike/favorite/name). Give a short one-line
+    # confirmation instead of sending it to the LLM - saying "I like
+    # pizza" doesn't need a multi-paragraph reply about relationship
+    # levels. Mood/important_event are deliberately excluded from
+    # this shortcut (see build_fact_ack in core/memory_extractor.py)
+    # so emotional disclosures still get a real response below.
+    # =========================================================
+    ack = fact_ack(changes)
+    if ack is not None:
+        add_message("user", text)
+        add_message("assistant", ack)
+        remember_today(load_conversation())
+        return ack
+
+    # =========================================================
     # 🤖 STEP 4 — NOTHING MATCHED → FALL THROUGH TO THE LLM
     # This is the only path that ever calls ask_ai().
     # =========================================================
 
-    # ❤️ Relationship context
     level = rel.get("level", load_relationship().get("level", 1))
 
+    # ❤️ Relationship context
     relationship_context = f"""
         Relationship Level: {level}
         User trust increases over time.

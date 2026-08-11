@@ -57,6 +57,55 @@ def load_facts():
             return {}
     return {}
 
+def save_fact_list(key, value):
+    """Append `value` to a list-valued fact instead of overwriting it.
+    Used for facts that accumulate over time (like, dislike) rather
+    than replace (user_name, mood). De-dupes case-insensitively so
+    saying "I like pizza" twice doesn't create two entries, and skips
+    empty captures so a bad extraction doesn't pollute the list."""
+    facts = load_facts()
+    existing = facts.get(key)
+
+    if isinstance(existing, list):
+        items = existing
+    elif isinstance(existing, str) and existing:
+        items = [existing]  # migrate a fact saved before accumulation existed
+    else:
+        items = []
+
+    value = (value or "").strip()
+    if value and value.lower() not in (v.lower() for v in items):
+        items.append(value)
+
+    facts[key] = items
+    FACTS_FILE.write_text(json.dumps(facts, indent=2))
+
+def remove_fact_list(key, value):
+    """Remove an item from a list-valued fact. Matches loosely (case-
+    insensitive substring either direction) since the spoken phrase
+    rarely matches the originally-stored text word-for-word - e.g.
+    stored "pizza" should be removed by "I don't like pizza anymore"
+    even though the captured phrase includes "anymore". Returns the
+    removed item's original stored text, or None if nothing matched."""
+    facts = load_facts()
+    existing = facts.get(key)
+
+    if not isinstance(existing, list) or not existing:
+        return None
+
+    value = (value or "").strip().lower()
+    if not value:
+        return None
+
+    for item in existing:
+        item_l = item.lower()
+        if item_l in value or value in item_l:
+            existing.remove(item)
+            facts[key] = existing
+            FACTS_FILE.write_text(json.dumps(facts, indent=2))
+            return item
+
+    return None
 
 def save_fact(key, value):
     facts = load_facts()
