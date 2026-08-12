@@ -39,14 +39,40 @@ def open_named_folder(name: str):
     return None
 
 
+# Matches "c drive", "open d drive", "e-drive" (hyphenated - the
+# `[\s\-]*` gap allows a space, a hyphen, or nothing between the
+# letter and "drive"), and bare "e:". Only ever a single word/token,
+# never a broader phrase.
+_DRIVE_RE = re.compile(r'\b([a-zA-Z])[\s\-]*(?:drive|:)\b', re.I)
+
+
 def open_drive(text: str):
-    """Match phrases like 'c drive', 'open d drive', or 'e:' and open
-    that drive's root. Returns None if no drive letter is mentioned."""
-    match = re.search(r'\b([a-zA-Z])\s*(?:drive|:)', text.lower())
-    if match:
-        letter = match.group(1).upper()
-        return open_path(f"{letter}:\\")
-    return None
+    """Match phrases like 'c drive', 'open d drive', 'e-drive', or
+    'e:' and open that drive's root. Returns None if no drive letter
+    is mentioned.
+
+    Guarded against false positives: this used to fire on ANY message
+    containing a bare letter immediately followed by "drive" or ":"
+    ANYWHERE in the sentence - so "nice day for a drive" opened the
+    A: drive, and "Q: what time is it" opened the Q: drive. A genuine
+    drive command is short and drive-focused ("open c drive", "d:"),
+    so messages longer than a handful of words are no longer treated
+    as drive commands at all.
+    """
+    lower = text.lower().strip()
+
+    match = _DRIVE_RE.search(lower)
+    if not match:
+        return None
+
+    # A real "open X drive" utterance is short. Anything longer is
+    # almost certainly just a sentence that happens to contain the
+    # substring "drive" or a colon, not an actual drive command.
+    if len(lower.split()) > 4:
+        return None
+
+    letter = match.group(1).upper()
+    return open_path(f"{letter}:\\")
 
 
 def find_file_or_folder(name: str):

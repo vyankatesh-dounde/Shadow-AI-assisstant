@@ -18,14 +18,24 @@ WAKE_WORDS = ["hey shadow", "shadow"]
 
 # Listen on all interfaces so devices on the same Wi-Fi/LAN can reach it.
 # Access it from another device using this machine's LAN IP, e.g. http://192.168.1.23:8000
-# NOTE: this must be 0.0.0.0 (not 127.0.0.1) for LAN access to actually work.
-HOST = "127.0.0.1"
+#
+# FIXED: this was previously set to 127.0.0.1, which only accepts
+# connections FROM this same PC - no phone/laptop on the LAN could
+# ever reach the dashboard, contradicting the whole "accessible across
+# a home network via browser" design. It must be 0.0.0.0 for LAN
+# access to actually work.
+HOST = "0.0.0.0"
 PORT = 8000
 
 # Simple shared-secret auth. Every browser tab must supply this token once
 # (it's then cached in that browser's localStorage).
 # CHANGE THIS before using Shadow on any network you don't fully trust -
 # it must NOT be left as an IP address or any other guessable default.
+#
+# NOTE: now that HOST is 0.0.0.0, this server is reachable by anything
+# on your LAN, not just this PC. Strongly consider setting
+# ENABLE_AUTH = True and changing API_TOKEN below before relying on
+# HOST = "0.0.0.0" outside a fully trusted home network.
 ENABLE_AUTH = False
 API_TOKEN = "change-me-shadow-2026"
 

@@ -10,7 +10,7 @@
   // refresh (Ctrl+Shift+R / Cmd+Shift+R), the browser is still
   // serving a cached copy of this file - that's the #1 cause of "I
   // updated the code but nothing changed."
-  console.log("[Shadow] app.js build 2026-08-05-wake-fix-3");
+  console.log("[Shadow] app.js build 2026-08-12-recognizer-error-fix");
 
   const TOKEN_KEY = "shadow_token";
   const WAKE_KEY = "shadow_wake_enabled";
@@ -411,6 +411,25 @@
     }
   }
 
+  // Extracted out of onresult so both the wake-word matcher below and
+  // any future caller can check EVERY alternative the recognizer
+  // returned, not just the top guess. Previously maxAlternatives = 3
+  // was set but nothing ever read alternatives [1] or [2], so it had
+  // no actual effect on wake-word recognition - a slightly-misheard
+  // top guess (e.g. "shadows" instead of "shadow") could fail to
+  // match even though a lower-ranked alternative was correct.
+  function findWakeWordInResult(result) {
+    for (let a = 0; a < result.length; a++) {
+      const transcript = (result[a].transcript || "").toLowerCase();
+      const hit = WAKE_WORDS.find((w) => transcript.includes(w));
+      if (hit) {
+        const after = transcript.slice(transcript.indexOf(hit) + hit.length).trim();
+        return { hit, after, transcript };
+      }
+    }
+    return null;
+  }
+
   if (SpeechRecognitionImpl) {
     recognizer = new SpeechRecognitionImpl();
     recognizer.lang = "en-US";
@@ -432,7 +451,8 @@
         recognizer.start();
       } catch (e) {
         // Rare: browser says it's already running. Let the next
-        // onend retry rather than crash here.
+        // onend (or onerror, now that it also re-arms - see below)
+        // retry rather than crash here.
       }
       updateWakeUI();
     }
@@ -450,6 +470,28 @@
       }
     }
 
+    // Shared "the session is actually over" logic. Both onend AND
+    // onerror (for error types that don't fire onend) call this so
+    // recognizerRunning is guaranteed to get reset and the recognizer
+    // gets re-armed into whatever mode was requested (or the
+    // wake/off default). Before this fix, onerror never touched
+    // recognizerRunning at all - only onend did - so for any browser
+    // error type that fires onerror WITHOUT a following onend, the
+    // flag stayed stuck at true forever. requestMode() would then
+    // call .stop() on a recognizer that had already stopped, onend
+    // would never fire to clear the flag, and both the wake toggle
+    // and the mic button became permanently unresponsive until the
+    // page was reloaded.
+    function finishSession() {
+      recognizerRunning = false;
+      micBtn.classList.remove("recording");
+      if (voiceMode === "active" && presence.dataset.state === "listening") setPresence("idle");
+
+      const next = pendingMode !== null ? pendingMode : (wakeEnabled ? "wake" : "off");
+      pendingMode = null;
+      applyMode(next);
+    }
+
     recognizer.onstart = () => {
       recognizerRunning = true;
       if (voiceMode === "active") {
@@ -460,21 +502,15 @@
     };
 
     recognizer.onend = () => {
-      recognizerRunning = false;
-      micBtn.classList.remove("recording");
-      if (voiceMode === "active" && presence.dataset.state === "listening") setPresence("idle");
-
       // Browsers also stop recognition on their own after a pause in
       // speech even in continuous mode, so re-arm using whatever was
       // requested, or fall back to wake/off based on the toggle.
-      const next = pendingMode !== null ? pendingMode : (wakeEnabled ? "wake" : "off");
-      pendingMode = null;
-      applyMode(next);
+      finishSession();
     };
 
     recognizer.onerror = (e) => {
-      micBtn.classList.remove("recording");
       setPresence("idle");
+
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         // Mic permission denied - stop trying, don't loop forever.
         wakeEnabled = false;
@@ -483,7 +519,21 @@
         wakeToggle.dataset.state = "blocked";
         wakeToggle.querySelector(".wake-label").textContent = "mic blocked";
       }
-      // other errors (e.g. "no-speech") are recovered by onend's restart
+
+      // FIXED: previously this handler never reset recognizerRunning
+      // or re-armed the recognizer - it relied entirely on onend to
+      // do that, but some error types (this varies by browser) never
+      // fire onend at all. That left recognizerRunning stuck at
+      // `true`, so every future requestMode() call tried to stop an
+      // already-stopped recognizer and nothing ever restarted -
+      // effectively bricking wake word and the mic button until a
+      // full page reload. onerror now always finishes the session
+      // itself instead of assuming onend will follow.
+      //
+      // "no-speech" and other benign/transient errors just fall
+      // through to the same recovery path - finishSession() re-arms
+      // wake mode (or off) automatically.
+      finishSession();
     };
 
     recognizer.onresult = (event) => {
@@ -503,12 +553,15 @@
 
       if (voiceMode === "wake") {
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript.toLowerCase();
-          console.debug("[Shadow][wake] heard:", transcript);
-          const hit = WAKE_WORDS.find((w) => transcript.includes(w));
-          if (!hit) continue;
+          // Check every alternative the recognizer offered for this
+          // result, not just the top guess - this is what
+          // maxAlternatives is actually for. A noisy environment can
+          // easily make "shadow" the model's 2nd or 3rd guess instead
+          // of its 1st.
+          const found = findWakeWordInResult(event.results[i]);
+          if (!found) continue;
 
-          const after = transcript.slice(transcript.indexOf(hit) + hit.length).trim();
+          const { hit, after } = found;
           console.debug("[Shadow][wake] wake word matched:", hit, "| remainder:", JSON.stringify(after));
 
           // Mark as transitioning immediately - same reasoning as

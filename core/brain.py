@@ -101,29 +101,54 @@ def _cmd_open(text, lower, facts):
         return open_website("youtube")
     if "google" in lower:
         return open_website("google")
-    if "file" in lower or "folder" in lower:
-        path = text.replace("open", "").strip()
-        return open_path(path)
 
-    name = lower.replace("open", "").strip()
+    # Strip only a single leading "open" (word boundary), not every
+    # occurrence of the substring "open" anywhere in the message -
+    # text.replace("open", "") used to also mangle names/paths that
+    # happened to contain "open" elsewhere in the phrase.
+    name = re.sub(r"^\s*open\s+", "", text, count=1, flags=re.I).strip()
+    name_lower = name.lower()
 
-    # "open desktop" / "open downloads" / etc.
-    folder_result = open_named_folder(name)
+    # "open desktop" / "open downloads" / etc. — checked BEFORE the
+    # generic "file"/"folder" fallback below. Previously, any message
+    # containing the substring "folder" (e.g. "open downloads folder",
+    # "open games folder") was intercepted by the "file"/"folder"
+    # branch first and treated as a literal filesystem path, so it
+    # never reached open_named_folder() at all - this is the
+    # long-standing "open games folder" bug.
+    folder_result = open_named_folder(name_lower)
     if folder_result:
         return folder_result
+
+    # Also try stripping a trailing "folder"/"file" word so "open
+    # games folder" resolves to the "games" folder/smart-search
+    # handler instead of a literal path lookup.
+    stripped_name = re.sub(r"\s+(folder|file)s?$", "", name_lower).strip()
+    if stripped_name and stripped_name != name_lower:
+        folder_result = open_named_folder(stripped_name)
+        if folder_result:
+            return folder_result
 
     # "open c drive" / "open d:"
     drive_result = open_drive(lower)
     if drive_result:
         return drive_result
 
+    # Explicit literal-path request: "open file <path>" / "open folder <path>"
+    if name_lower.startswith("file ") or name_lower.startswith("folder "):
+        path = re.sub(r"^(file|folder)\s+", "", name, flags=re.I).strip()
+        return open_path(path)
+
     # known app shortcut (chrome, notepad, vs code, ...)
     result = open_app(text)
     if "couldn't find" not in result.lower():
         return result
 
-    # last resort: fuzzy filesystem search
-    return open_smart(name)
+    # last resort: fuzzy filesystem search (this is what actually
+    # handles "open games folder" -> named/smart-search lookup for
+    # "games", instead of open_path() treating "games folder" as a
+    # literal path that will never exist).
+    return open_smart(stripped_name or name)
 
 
 def _cmd_volume(text, lower, facts):
@@ -166,6 +191,23 @@ COMMANDS = [
 ]
 
 
+def _store_ai_extracted_memory(memory: dict):
+    """Persist whatever ai_extract_memory() returned. Only ever called
+    from Step 4, and only ever with values that are already validated
+    to be non-empty strings (see ai_extract_memory() in
+    core/memory_extractor.py) - a raw list/dict/number used to get
+    silently stringified via str(v) here, which is how entries like
+    "['Beatles']" ended up saved verbatim into facts.json instead of
+    a clean "Beatles" string."""
+    for k, v in memory.items():
+        if not isinstance(v, str) or not v.strip():
+            continue
+        if k in ("like", "dislike"):
+            save_fact_list(k, v)
+        else:
+            save_fact(k, v)
+
+
 async def process(text, personality):
     lower = text.lower().strip()
 
@@ -185,24 +227,18 @@ async def process(text, personality):
         return reply
 
     # =========================================================
-    # 🧠 STEP 2 — LEARN FROM USER
-    # Runs for every real message, whether it turns out to be a
-    # command or something that needs the LLM. `changes` captures
-    # what extract_and_store() actually saved/removed (if anything) -
-    # used below, after the command router, to short-circuit plain
-    # fact statements ("I like pizza") straight to a canned reply
-    # instead of an LLM round trip.
+    # 🧠 STEP 2 — LEARN FROM USER (deterministic only)
+    #
+    # Only the cheap, regex-based extractor runs here. The LLM-based
+    # extractor (ai_extract_memory) is NOT run at this point anymore -
+    # it used to run here for any message with 4+ words, which meant
+    # an Ollama round trip happened BEFORE the command router even got
+    # a chance to match a deterministic command like "remind me to
+    # call mom at 6pm" or "switch to previous window". It now only
+    # runs in Step 4, after we already know nothing else matched and
+    # we're calling the LLM anyway (see below).
     # =========================================================
     changes = learn_from_text(text)
-
-    if len(text.split()) >= 4:
-        memory = await ai_extract_memory(text, personality)
-        for k, v in memory.items():
-            if k in ("like", "dislike"):
-                save_fact_list(k, str(v))
-            else:
-                save_fact(k, str(v))
-        facts = load_facts()  # pick up anything ai_extract_memory just saved
 
     rel = update_relationship(text)
     facts = load_facts()
@@ -241,8 +277,18 @@ async def process(text, personality):
 
     # =========================================================
     # 🤖 STEP 4 — NOTHING MATCHED → FALL THROUGH TO THE LLM
-    # This is the only path that ever calls ask_ai().
+    #
+    # This is the only path that ever calls ask_ai() for a real reply,
+    # AND (now) the only path that ever calls ai_extract_memory() -
+    # both only run once we already know this message needs the LLM
+    # anyway, so no deterministic command ever pays for an extra
+    # Ollama round trip.
     # =========================================================
+    if len(text.split()) >= 4:
+        memory = await ai_extract_memory(text, personality)
+        if memory:
+            _store_ai_extracted_memory(memory)
+            facts = load_facts()  # pick up anything ai_extract_memory just saved
 
     level = rel.get("level", load_relationship().get("level", 1))
 
