@@ -235,17 +235,331 @@
   // =======================================================
   // PRESENCE (the signature ring: idle / listening / thinking / speaking)
   // =======================================================
+    // =======================================================
+  // PRESENCE + TTS AUDIO
+  // =======================================================
 
   function setPresence(state) {
     presence.dataset.state = state;
   }
 
+  // -------------------------------------------------------
+  // TTS AUDIO STATE
+  // -------------------------------------------------------
+
+  let audioUnlocked = false;
+  let pendingAudioUrl = null;
+  let audioRetryTimer = null;
+
+  // -------------------------------------------------------
+  // UNLOCK AUDIO
+  // -------------------------------------------------------
+  //
+  // Chrome requires a user interaction before some kinds of
+  // programmatic audio playback are allowed.
+  //
+  // We unlock Shadow's audio element after the user's first
+  // click/touch/key interaction.
+  //
+
+  function unlockTtsAudio() {
+    if (audioUnlocked || !ttsAudio) return;
+
+    try {
+      // Temporarily remove the source.
+      const oldSrc = ttsAudio.src;
+
+      ttsAudio.removeAttribute("src");
+      ttsAudio.load();
+
+      const promise = ttsAudio.play();
+
+      if (promise && typeof promise.then === "function") {
+
+        promise
+          .then(() => {
+
+            ttsAudio.pause();
+            ttsAudio.currentTime = 0;
+
+            audioUnlocked = true;
+
+            if (oldSrc) {
+              ttsAudio.src = oldSrc;
+            }
+
+            console.debug("[Shadow][audio] audio unlocked");
+
+            flushPendingAudio();
+          })
+          .catch((error) => {
+
+            console.debug(
+              "[Shadow][audio] unlock waiting for user gesture:",
+              error
+            );
+
+          });
+      }
+
+    } catch (error) {
+
+      console.debug(
+        "[Shadow][audio] unlock error:",
+        error
+      );
+    }
+  }
+
+
+  // -------------------------------------------------------
+  // RETRY QUEUE
+  // -------------------------------------------------------
+
+  function scheduleAudioRetry() {
+
+    if (audioRetryTimer) {
+      return;
+    }
+
+    audioRetryTimer = setTimeout(() => {
+
+      audioRetryTimer = null;
+
+      if (!pendingAudioUrl) {
+        return;
+      }
+
+      // Try immediately if the Shadow tab is visible.
+      if (!document.hidden) {
+        const url = pendingAudioUrl;
+
+        pendingAudioUrl = null;
+
+        playAudio(url);
+      }
+
+    }, 700);
+  }
+
+
+  function flushPendingAudio() {
+
+    if (!pendingAudioUrl) {
+      return;
+    }
+
+    const url = pendingAudioUrl;
+
+    pendingAudioUrl = null;
+
+    playAudio(url);
+  }
+
+
+  // -------------------------------------------------------
+  // USER INTERACTION → UNLOCK AUDIO
+  // -------------------------------------------------------
+
+  ["pointerdown", "keydown", "touchstart"].forEach((eventName) => {
+
+    window.addEventListener(
+      eventName,
+      unlockTtsAudio,
+      {
+        capture: true,
+        passive: true
+      }
+    );
+
+  });
+
+
+  // -------------------------------------------------------
+  // PAGE VISIBILITY
+  // -------------------------------------------------------
+
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+
+      console.debug(
+        "[Shadow][audio] visibility:",
+        document.visibilityState
+      );
+
+      if (!document.hidden) {
+        flushPendingAudio();
+      }
+
+    }
+  );
+
+
+  // -------------------------------------------------------
+  // WINDOW FOCUS
+  // -------------------------------------------------------
+
+  window.addEventListener(
+    "focus",
+    () => {
+
+      console.debug("[Shadow][audio] Shadow window focused");
+
+      flushPendingAudio();
+
+    }
+  );
+
+
+  // -------------------------------------------------------
+  // MAIN PLAY AUDIO FUNCTION
+  // -------------------------------------------------------
+
   function playAudio(url) {
-    if (!url) return;
+
+    if (!url) {
+      console.debug("[Shadow][audio] No audio URL");
+      return;
+    }
+
+    console.debug(
+      "[Shadow][audio] attempting playback:",
+      url
+    );
+
+    pendingAudioUrl = url;
+
     setPresence("speaking");
-    ttsAudio.src = url;
-    ttsAudio.play().catch(() => {});
-    ttsAudio.onended = () => setPresence("idle");
+
+
+    try {
+
+      // ---------------------------------------------------
+      // CLEAN OLD EVENTS
+      // ---------------------------------------------------
+
+      ttsAudio.onended = null;
+      ttsAudio.onerror = null;
+
+
+      // ---------------------------------------------------
+      // PLAYBACK FINISHED
+      // ---------------------------------------------------
+
+      ttsAudio.onended = () => {
+
+        console.debug(
+          "[Shadow][audio] playback finished"
+        );
+
+        if (pendingAudioUrl === url) {
+          pendingAudioUrl = null;
+        }
+
+        setPresence("idle");
+      };
+
+
+      // ---------------------------------------------------
+      // PLAYBACK ERROR
+      // ---------------------------------------------------
+
+      ttsAudio.onerror = () => {
+
+        console.warn(
+          "[Shadow][audio] audio element error:",
+          ttsAudio.error
+        );
+
+        // Don't permanently keep a broken URL.
+        if (pendingAudioUrl === url) {
+          pendingAudioUrl = null;
+        }
+
+        setPresence("idle");
+      };
+
+
+      // ---------------------------------------------------
+      // LOAD AUDIO
+      // ---------------------------------------------------
+
+      ttsAudio.src = url;
+
+      ttsAudio.load();
+
+
+      // ---------------------------------------------------
+      // START PLAYBACK
+      // ---------------------------------------------------
+
+      const promise = ttsAudio.play();
+
+
+      // Modern Chrome returns a Promise from play().
+      if (promise && typeof promise.then === "function") {
+
+        promise
+
+          .then(() => {
+
+            console.debug(
+              "[Shadow][audio] playback started successfully"
+            );
+
+            audioUnlocked = true;
+
+            if (pendingAudioUrl === url) {
+              pendingAudioUrl = null;
+            }
+
+          })
+
+          .catch((error) => {
+
+            console.warn(
+              "[Shadow][audio] play() failed:",
+              error.name,
+              error.message
+            );
+
+
+            // Keep the audio URL so we can retry.
+            pendingAudioUrl = url;
+
+
+            // If this was an autoplay restriction,
+            // playback will be retried after interaction.
+            if (
+              error.name === "NotAllowedError" ||
+              error.name === "AbortError"
+            ) {
+
+              console.warn(
+                "[Shadow][audio] Chrome blocked automatic playback"
+              );
+
+            }
+
+
+            scheduleAudioRetry();
+
+          });
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "[Shadow][audio] unexpected playback error:",
+        error
+      );
+
+      pendingAudioUrl = url;
+
+      scheduleAudioRetry();
+    }
   }
 
   // =======================================================

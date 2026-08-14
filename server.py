@@ -1,8 +1,3 @@
-# server.py
-#
-# Shadow's web entry point: `python server.py`, then open
-# http://<this-PC's-LAN-IP>:8000 from any phone/laptop on the same Wi-Fi.
-
 import asyncio
 import sys
 from contextlib import asynccontextmanager

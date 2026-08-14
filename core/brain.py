@@ -14,6 +14,7 @@ from core.reminder_nlp import try_create_reminder
 from core.wake_word import is_wake_word, handle_wake_word
 from core.memory import add_message, load_facts, load_conversation, save_fact, save_fact_list
 from core.memory_extractor import ai_extract_memory
+from core.web_search import search_and_format
 from integrations.memory_integration import (
     learn_from_text,
     fact_ack,
@@ -25,26 +26,56 @@ from integrations.memory_integration import (
 
 # =========================================================
 # ⚡ COMMAND HANDLERS
-#
-# Every function below takes (text, lower, facts) and returns either
-# a reply string (it matched → stop here, LLM never runs) or None
-# (it didn't match → keep trying the next one). This is the single
-# source of truth for "is this a command Shadow already knows how to
-# do, or does it need the LLM."
-#
-# ORDER MATTERS - checked top to bottom, first match wins.
 # =========================================================
 
 def _cmd_reminder(text, lower, facts):
-    # "remind me to drink water in 10 minutes" etc.
     return try_create_reminder(text)
 
+
+def _cmd_web_search(text, lower, facts):
+    """Search the web and return actual result titles/snippets/URLs.
+
+    This is deliberately before the generic `open` handler so a request
+    like "search for Python FastAPI" cannot be mistaken for an app/file
+    command.
+    """
+    prefixes = (
+        "search the web for ",
+        "search web for ",
+        "web search for ",
+        "search google for ",
+        "search google ",
+        "google search for ",
+        "google for ",
+        "google ",
+        "search for ",
+        "search ",
+        "look up ",
+        "look online for ",
+        "find online ",
+    )
+
+    query = None
+    for prefix in prefixes:
+        if lower.startswith(prefix):
+            query = text[len(prefix):].strip()
+            break
+
+    if not query:
+        return None
+
+    # Avoid treating a very short empty-ish command as a real search.
+    if not query:
+        return "What should I search for?"
+
+    return search_and_format(query)
+
+
 def _cmd_drive(text, lower, facts):
-    # "C drive", "open D drive", "d:" — works with or without "open"
     return open_drive(lower)
 
+
 def _cmd_skill(text, lower, facts):
-    # math / time / date - fast, deterministic, no LLM needed.
     return handle_skills(text)
 
 
@@ -102,52 +133,36 @@ def _cmd_open(text, lower, facts):
     if "google" in lower:
         return open_website("google")
 
-    # Strip only a single leading "open" (word boundary), not every
-    # occurrence of the substring "open" anywhere in the message -
-    # text.replace("open", "") used to also mangle names/paths that
-    # happened to contain "open" elsewhere in the phrase.
     name = re.sub(r"^\s*open\s+", "", text, count=1, flags=re.I).strip()
     name_lower = name.lower()
 
-    # "open desktop" / "open downloads" / etc. — checked BEFORE the
-    # generic "file"/"folder" fallback below. Previously, any message
-    # containing the substring "folder" (e.g. "open downloads folder",
-    # "open games folder") was intercepted by the "file"/"folder"
-    # branch first and treated as a literal filesystem path, so it
-    # never reached open_named_folder() at all - this is the
-    # long-standing "open games folder" bug.
     folder_result = open_named_folder(name_lower)
     if folder_result:
         return folder_result
 
-    # Also try stripping a trailing "folder"/"file" word so "open
-    # games folder" resolves to the "games" folder/smart-search
-    # handler instead of a literal path lookup.
-    stripped_name = re.sub(r"\s+(folder|file)s?$", "", name_lower).strip()
+    stripped_name = re.sub(
+        r"\s+(folder|file)s?$", "", name_lower
+    ).strip()
+
     if stripped_name and stripped_name != name_lower:
         folder_result = open_named_folder(stripped_name)
         if folder_result:
             return folder_result
 
-    # "open c drive" / "open d:"
     drive_result = open_drive(lower)
     if drive_result:
         return drive_result
 
-    # Explicit literal-path request: "open file <path>" / "open folder <path>"
     if name_lower.startswith("file ") or name_lower.startswith("folder "):
-        path = re.sub(r"^(file|folder)\s+", "", name, flags=re.I).strip()
+        path = re.sub(
+            r"^(file|folder)\s+", "", name, flags=re.I
+        ).strip()
         return open_path(path)
 
-    # known app shortcut (chrome, notepad, vs code, ...)
     result = open_app(text)
     if "couldn't find" not in result.lower():
         return result
 
-    # last resort: fuzzy filesystem search (this is what actually
-    # handles "open games folder" -> named/smart-search lookup for
-    # "games", instead of open_path() treating "games folder" as a
-    # literal path that will never exist).
     return open_smart(stripped_name or name)
 
 
@@ -160,25 +175,32 @@ def _cmd_volume(text, lower, facts):
 
 
 def _cmd_power(text, lower, facts):
-    # Deliberately NOT triggered by a bare "shutdown"/"restart" word
-    # with no context - a message merely *containing* one of these
-    # used to restart/shut down the PC with zero confirmation. They
-    # now always point to the dashboard's Power panel, which asks
-    # first.
     if any(w in lower for w in ("shutdown", "stop server", "close server")):
-        return "Use the Stop Server button on the dashboard to shut the server down safely."
+        return (
+            "Use the Stop Server button on the dashboard "
+            "to shut the server down safely."
+        )
 
-    if "restart" in lower and ("pc" in lower or "computer" in lower or "windows" in lower):
-        return "Use the Restart button on the dashboard - it'll ask you to confirm first."
+    if "restart" in lower and (
+        "pc" in lower or "computer" in lower or "windows" in lower
+    ):
+        return (
+            "Use the Restart button on the dashboard - "
+            "it'll ask you to confirm first."
+        )
 
     if "sleep pc" in lower or ("sleep" in lower and "computer" in lower):
-        return "Use the Sleep button on the dashboard - it'll ask you to confirm first."
+        return (
+            "Use the Sleep button on the dashboard - "
+            "it'll ask you to confirm first."
+        )
 
     return None
 
 
 COMMANDS = [
     _cmd_reminder,
+    _cmd_web_search,
     _cmd_skill,
     _cmd_index_files,
     _cmd_open_my,
@@ -192,16 +214,10 @@ COMMANDS = [
 
 
 def _store_ai_extracted_memory(memory: dict):
-    """Persist whatever ai_extract_memory() returned. Only ever called
-    from Step 4, and only ever with values that are already validated
-    to be non-empty strings (see ai_extract_memory() in
-    core/memory_extractor.py) - a raw list/dict/number used to get
-    silently stringified via str(v) here, which is how entries like
-    "['Beatles']" ended up saved verbatim into facts.json instead of
-    a clean "Beatles" string."""
     for k, v in memory.items():
         if not isinstance(v, str) or not v.strip():
             continue
+
         if k in ("like", "dislike"):
             save_fact_list(k, v)
         else:
@@ -212,13 +228,7 @@ async def process(text, personality):
     lower = text.lower().strip()
 
     # =========================================================
-    # 👋 STEP 1 — WAKE WORD (checked before literally anything else)
-    #
-    # A bare "shadow" / "hey shadow" is just the trigger that opens
-    # the mic - it isn't a question. It gets a canned "Yes?" /
-    # "Good morning..." reply and STOPS here. It is never learned
-    # from, never scored for relationship points, never checked
-    # against commands, and never sent to the LLM.
+    # 👋 STEP 1 — WAKE WORD
     # =========================================================
     if is_wake_word(text):
         reply = handle_wake_word(text)
@@ -227,16 +237,7 @@ async def process(text, personality):
         return reply
 
     # =========================================================
-    # 🧠 STEP 2 — LEARN FROM USER (deterministic only)
-    #
-    # Only the cheap, regex-based extractor runs here. The LLM-based
-    # extractor (ai_extract_memory) is NOT run at this point anymore -
-    # it used to run here for any message with 4+ words, which meant
-    # an Ollama round trip happened BEFORE the command router even got
-    # a chance to match a deterministic command like "remind me to
-    # call mom at 6pm" or "switch to previous window". It now only
-    # runs in Step 4, after we already know nothing else matched and
-    # we're calling the LLM anyway (see below).
+    # 🧠 STEP 2 — LEARN FROM USER
     # =========================================================
     changes = learn_from_text(text)
 
@@ -246,9 +247,6 @@ async def process(text, personality):
 
     # =========================================================
     # ⚡ STEP 3 — COMMAND ROUTER
-    # Try every known command in order. The first one that matches
-    # runs its action and returns immediately - the LLM never sees
-    # this message at all.
     # =========================================================
     for command in COMMANDS:
         reply = command(text, lower, facts)
@@ -260,13 +258,6 @@ async def process(text, personality):
 
     # =========================================================
     # 📝 STEP 3.5 — QUICK FACT ACK
-    # No command matched, but Step 2 recognized a plain fact
-    # statement (like/dislike/favorite/name). Give a short one-line
-    # confirmation instead of sending it to the LLM - saying "I like
-    # pizza" doesn't need a multi-paragraph reply about relationship
-    # levels. Mood/important_event are deliberately excluded from
-    # this shortcut (see build_fact_ack in core/memory_extractor.py)
-    # so emotional disclosures still get a real response below.
     # =========================================================
     ack = fact_ack(changes)
     if ack is not None:
@@ -276,30 +267,22 @@ async def process(text, personality):
         return ack
 
     # =========================================================
-    # 🤖 STEP 4 — NOTHING MATCHED → FALL THROUGH TO THE LLM
-    #
-    # This is the only path that ever calls ask_ai() for a real reply,
-    # AND (now) the only path that ever calls ai_extract_memory() -
-    # both only run once we already know this message needs the LLM
-    # anyway, so no deterministic command ever pays for an extra
-    # Ollama round trip.
+    # 🤖 STEP 4 — LLM FALLBACK
     # =========================================================
     if len(text.split()) >= 4:
         memory = await ai_extract_memory(text, personality)
         if memory:
             _store_ai_extracted_memory(memory)
-            facts = load_facts()  # pick up anything ai_extract_memory just saved
+            facts = load_facts()
 
     level = rel.get("level", load_relationship().get("level", 1))
 
-    # ❤️ Relationship context
     relationship_context = f"""
         Relationship Level: {level}
         User trust increases over time.
         At higher levels, be more personal, relaxed, and expressive.
     """
 
-    # 🧠 Memory context
     memory_context = build_memory_context()
 
     enhanced_input = f"""
@@ -308,23 +291,25 @@ async def process(text, personality):
     User: {text}
     """
 
-    reply = await ask_ai(enhanced_input, personality, facts, conversation)
+    reply = await ask_ai(
+        enhanced_input,
+        personality,
+        facts,
+        conversation,
+    )
 
-    # 🎭 Behavior tweak (human-like) at higher relationship levels
     if level >= 4:
         if not reply.endswith(("?", ".", "!")):
             reply += "."
-        reply = reply.replace("I will", "I'll").replace("you are", "you're")
+        reply = reply.replace("I will", "I'll").replace(
+            "you are", "you're"
+        )
 
     if level >= 5:
         reply = reply.replace("Hello", "Hey")
 
-    # 💾 Save conversation - keep the user's side always, but don't
-    # let a canned fallback ("I'm offline right now.", etc.) enter
-    # history, since a small model will sometimes try to continue/
-    # explain that meta-text on the next turn instead of answering
-    # the new question.
     add_message("user", text)
+
     if reply not in FALLBACK_REPLIES:
         add_message("assistant", reply)
 

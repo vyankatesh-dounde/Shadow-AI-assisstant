@@ -24,7 +24,7 @@ WAKE_WORDS = ["hey shadow", "shadow"]
 # ever reach the dashboard, contradicting the whole "accessible across
 # a home network via browser" design. It must be 0.0.0.0 for LAN
 # access to actually work.
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 PORT = 8000
 
 # Simple shared-secret auth. Every browser tab must supply this token once
