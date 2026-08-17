@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Shadow — Web Edition
 
 Shadow as a real-time, LAN-accessible web app. Run one server on your
