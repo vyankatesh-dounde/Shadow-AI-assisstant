@@ -3,7 +3,10 @@
 # Small helper the web dashboard polls/broadcasts so every connected
 # device can see what the host PC is doing right now.
 
+<<<<<<< HEAD
 import time
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 import psutil
 
 try:
@@ -39,7 +42,11 @@ def get_status():
             "memory": mem,
             "battery": battery,
             "active_window": get_active_window_title(),
+<<<<<<< HEAD
             "uptime_seconds": max(0, int(time.time() - psutil.boot_time())),
+=======
+            "uptime_seconds": int(psutil.boot_time()),
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         }
     except Exception as e:
         return {"error": str(e)}

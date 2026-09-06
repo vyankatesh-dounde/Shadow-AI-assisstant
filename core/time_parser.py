@@ -4,8 +4,11 @@ import datetime
 
 
 def _apply_ampm(hour, ampm):
+<<<<<<< HEAD
     if not 1 <= hour <= 12:
         return None
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     if ampm == "pm" and hour != 12:
         hour += 12
     if ampm == "am" and hour == 12:
@@ -13,10 +16,13 @@ def _apply_ampm(hour, ampm):
     return hour
 
 
+<<<<<<< HEAD
 def _valid_clock(hour, minute):
     return hour is not None and 0 <= hour <= 23 and 0 <= minute <= 59
 
 
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 def parse_time(text):
     """Turn a natural-language "when" string into a Unix timestamp.
 
@@ -58,8 +64,11 @@ def parse_time(text):
     if match:
         hour = _apply_ampm(int(match.group(1)), match.group(3))
         minute = int(match.group(2) or 0)
+<<<<<<< HEAD
         if not _valid_clock(hour, minute):
             return None
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
         target = tomorrow.replace(hour=hour, minute=minute, second=0, microsecond=0)
         return target.timestamp()
@@ -80,8 +89,11 @@ def parse_time(text):
     if match:
         hour = _apply_ampm(int(match.group(1)), match.group(3))
         minute = int(match.group(2) or 0)
+<<<<<<< HEAD
         if not _valid_clock(hour, minute):
             return None
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         return _next_occurrence(hour, minute)
 
     # 24-hour clock, e.g. "at 18:30" / "18:30"

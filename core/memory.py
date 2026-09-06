@@ -116,12 +116,17 @@ def _normalize_item(value: Any) -> Optional[str]:
                     parts = [_normalize_item(v) for v in parsed]
                     parts = [p for p in parts if p]
                     return ", ".join(parts) if parts else None
+<<<<<<< HEAD
             except json.JSONDecodeError:
                 # Older releases wrote Python-style list strings, e.g.
                 # "['Beatles']". Parse only that narrow legacy shape.
                 inner = value[1:-1].strip()
                 if len(inner) >= 2 and inner[0] == "'" and inner[-1] == "'":
                     return inner[1:-1].strip() or None
+=======
+            except Exception:
+                pass
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
         return value
 
@@ -325,4 +330,8 @@ def remove_favorite_if_matches(value: Any) -> Optional[str]:
         _write_facts(facts)
         return favorite
 
+<<<<<<< HEAD
     return None
+=======
+    return None
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

@@ -19,7 +19,15 @@ WAKE_WORDS = ["hey shadow", "shadow"]
 # Listen on all interfaces so devices on the same Wi-Fi/LAN can reach it.
 # Access it from another device using this machine's LAN IP, e.g. http://192.168.1.23:8000
 #
+<<<<<<< HEAD
 # Use 127.0.0.1 if this should only be available on this PC.
+=======
+# FIXED: this was previously set to 127.0.0.1, which only accepts
+# connections FROM this same PC - no phone/laptop on the LAN could
+# ever reach the dashboard, contradicting the whole "accessible across
+# a home network via browser" design. It must be 0.0.0.0 for LAN
+# access to actually work.
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 HOST = "127.0.0.1"
 PORT = 8000
 
@@ -33,6 +41,7 @@ PORT = 8000
 # ENABLE_AUTH = True and changing API_TOKEN below before relying on
 # HOST = "0.0.0.0" outside a fully trusted home network.
 ENABLE_AUTH = False
+<<<<<<< HEAD
 # Set this to a long, random secret before starting the server.
 # The server deliberately refuses to start while this placeholder remains.
 API_TOKEN = "change-this-to-a-long-random-secret"
@@ -42,6 +51,13 @@ API_TOKEN = "change-this-to-a-long-random-secret"
 # Keep this same-origin by default. Add explicit origins only if you host
 # the dashboard behind another trusted domain.
 ALLOWED_ORIGINS = []
+=======
+API_TOKEN = "change-me-shadow-2026"
+
+# CORS origins allowed to talk to the API. "*" is convenient for a closed
+# home LAN; tighten this if you expose the server more broadly.
+ALLOWED_ORIGINS = ["*"]
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
 # Actions that require an explicit confirmation flag from the client
 # before core/desktop_control.py (or core/server_control.py) will run
@@ -54,4 +70,8 @@ CONFIRM_REQUIRED_ACTIONS = {"stop_server", "restart", "sleep_pc", "close"}
 REMINDER_POLL_INTERVAL = 2
 
 # How often (seconds) the server broadcasts system status (CPU/RAM/active window).
+<<<<<<< HEAD
 STATUS_BROADCAST_INTERVAL = 3
+=======
+STATUS_BROADCAST_INTERVAL = 3
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

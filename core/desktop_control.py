@@ -1,6 +1,9 @@
 import os
 import re
+<<<<<<< HEAD
 import subprocess
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 import webbrowser
 import pyautogui
 from pathlib import Path
@@ -44,7 +47,11 @@ def open_named_folder(name: str):
 # `[\s\-]*` gap allows a space, a hyphen, or nothing between the
 # letter and "drive"), and bare "e:". Only ever a single word/token,
 # never a broader phrase.
+<<<<<<< HEAD
 _DRIVE_RE = re.compile(r'\b([a-zA-Z])(?:[\s\-]*drive\b|:)', re.I)
+=======
+_DRIVE_RE = re.compile(r'\b([a-zA-Z])[\s\-]*(?:drive|:)\b', re.I)
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
 
 def open_drive(text: str):
@@ -159,6 +166,7 @@ def close_app(name: str):
     name = name.strip().lower().replace(".exe", "")
     if not name:
         return close_window()
+<<<<<<< HEAD
     # Never pass a client-controlled process name through a shell.  Apart
     # from preventing command injection, this keeps the action limited to a
     # normal Windows executable name.
@@ -176,6 +184,12 @@ def close_app(name: str):
             return f"I couldn't find a running {name} process."
         return f"Closing {name}"
     except (OSError, subprocess.SubprocessError):
+=======
+    try:
+        os.system(f"taskkill /f /im {name}.exe")
+        return f"Closing {name}"
+    except Exception:
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         return f"Failed to close {name}"
 
 
@@ -290,4 +304,8 @@ def cancel_shutdown():
         os.system("shutdown /a")
         return "Restart cancelled."
     except Exception:
+<<<<<<< HEAD
         return "Nothing to cancel."
+=======
+        return "Nothing to cancel."
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

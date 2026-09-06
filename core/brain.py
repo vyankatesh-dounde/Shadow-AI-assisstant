@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import asyncio
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 import re
 
 from ai.llm import ask_ai, FALLBACK_REPLIES
@@ -42,7 +45,10 @@ def _cmd_web_search(text, lower, facts):
     """
     prefixes = (
         "search the web for ",
+<<<<<<< HEAD
         "search in web for ",
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         "search web for ",
         "web search for ",
         "search google for ",
@@ -63,9 +69,16 @@ def _cmd_web_search(text, lower, facts):
             query = text[len(prefix):].strip()
             break
 
+<<<<<<< HEAD
     if query is None:
         return None
 
+=======
+    if not query:
+        return None
+
+    # Avoid treating a very short empty-ish command as a real search.
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     if not query:
         return "What should I search for?"
 
@@ -250,9 +263,13 @@ async def process(text, personality):
     # ⚡ STEP 3 — COMMAND ROUTER
     # =========================================================
     for command in COMMANDS:
+<<<<<<< HEAD
         # Search, indexing, and desktop automation are blocking OS work.
         # Keep them off the FastAPI event loop.
         reply = await asyncio.to_thread(command, text, lower, facts)
+=======
+        reply = command(text, lower, facts)
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         if reply is not None:
             add_message("user", text)
             add_message("assistant", reply)
@@ -318,4 +335,8 @@ async def process(text, personality):
 
     remember_today(load_conversation())
 
+<<<<<<< HEAD
     return reply
+=======
+    return reply
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

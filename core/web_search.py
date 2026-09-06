@@ -21,7 +21,11 @@ import webbrowser
 from pathlib import Path
 from urllib.parse import quote_plus
 
+<<<<<<< HEAD
 import requests
+=======
+import pyautogui
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
 
 GOOGLE_SEARCH_URL = "https://www.google.com/search"
@@ -233,6 +237,7 @@ def _parse_results(page_text: str, query: str) -> list[dict]:
     return results
 
 
+<<<<<<< HEAD
 def search_web(query: str) -> list[dict]:
     """Search without stealing the active window or overwriting clipboard.
 
@@ -278,12 +283,53 @@ def search_web(query: str) -> list[dict]:
 
     add_topics(payload.get("RelatedTopics", []))
     return results[:MAX_RESULTS]
+=======
+def search_google_with_chrome(
+    query: str,
+    open_browser: bool = True,
+) -> list[dict]:
+    query = (query or "").strip()
+
+    if not query:
+        return []
+
+    url = f"{GOOGLE_SEARCH_URL}?q={quote_plus(query)}"
+
+    if open_browser:
+        if not _open_chrome(url):
+            return []
+
+        time.sleep(CHROME_WAIT_SECONDS)
+
+    page_text = _copy_page_text()
+
+    if not page_text:
+        return []
+
+    if _looks_blocked(page_text):
+        return [{
+            "title": "Google requires verification",
+            "url": url,
+            "snippet": (
+                "Google displayed a verification page. "
+                "The search was opened in Chrome, but Shadow "
+                "could not safely read the results."
+            ),
+        }]
+
+    return _parse_results(page_text, query)
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
 
 def format_search_results(query: str, results: list[dict]) -> str:
     if not results:
         return (
+<<<<<<< HEAD
             f"I couldn't retrieve web results for '{query}'."
+=======
+            f"I opened Google for '{query}', but I couldn't read the "
+            "results from Chrome."
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         )
 
     if (
@@ -295,7 +341,11 @@ def format_search_results(query: str, results: list[dict]) -> str:
             "asking for verification. Complete it in Chrome and try again."
         )
 
+<<<<<<< HEAD
     lines = [f"Web results for: {query}"]
+=======
+    lines = [f"Google results for: {query}"]
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
     for index, result in enumerate(results, 1):
         lines.append(f"{index}. {result['title']}")
@@ -310,7 +360,11 @@ def format_search_results(query: str, results: list[dict]) -> str:
 
 
 def search_and_format(query: str) -> str:
+<<<<<<< HEAD
     results = search_web(query)
+=======
+    results = search_google_with_chrome(query)
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     return format_search_results(query, results)
 
 
@@ -325,4 +379,8 @@ def open_google_search(query: str) -> str:
     if _open_chrome(url):
         return f"Opening Google results for {query}"
 
+<<<<<<< HEAD
     return "I couldn't open Chrome."
+=======
+    return "I couldn't open Chrome."
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

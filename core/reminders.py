@@ -1,6 +1,9 @@
 import time
 import json
+<<<<<<< HEAD
 import uuid
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,7 +27,11 @@ def save_reminders(reminders):
 def add_reminder(text, trigger_time):
     reminders = load_reminders()
     reminders.append({
+<<<<<<< HEAD
         "id": f"r_{uuid.uuid4().hex}",
+=======
+        "id": f"r_{int(time.time() * 1000)}",
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         "text": text,
         "time": trigger_time,
         "done": False
@@ -38,19 +45,29 @@ def get_due_reminders():
 
     due = []
     for r in reminders:
+<<<<<<< HEAD
         if not isinstance(r, dict):
             continue
         if not r.get("done", False) and isinstance(r.get("time"), (int, float)) and r["time"] <= now:
             r["done"] = True
             if isinstance(r.get("text"), str):
                 due.append(r["text"])
+=======
+        if not r["done"] and r["time"] <= now:
+            r["done"] = True
+            due.append(r["text"])
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
     save_reminders(reminders)
     return due
 
 
 def list_reminders():
+<<<<<<< HEAD
     return [r for r in load_reminders() if isinstance(r, dict) and not r.get("done", False)]
+=======
+    return [r for r in load_reminders() if not r["done"]]
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
 
 def delete_reminder(reminder_id):

@@ -9,6 +9,10 @@
   "dislike": [
     "movies",
     "green vegetables",
+<<<<<<< HEAD
     "Beatles"
+=======
+    "['Beatles']"
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   ]
 }

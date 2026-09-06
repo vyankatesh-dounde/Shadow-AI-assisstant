@@ -10,7 +10,11 @@
   // refresh (Ctrl+Shift+R / Cmd+Shift+R), the browser is still
   // serving a cached copy of this file - that's the #1 cause of "I
   // updated the code but nothing changed."
+<<<<<<< HEAD
   console.log("[Shadow] app.js build 2026-09-05-3d-hologram-layer-fix");
+=======
+  console.log("[Shadow] app.js build 2026-08-12-recognizer-error-fix");
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
   const TOKEN_KEY = "shadow_token";
   const WAKE_KEY = "shadow_wake_enabled";
@@ -24,6 +28,10 @@
   const gateError = el("gate-error");
   const app = el("app");
 
+<<<<<<< HEAD
+=======
+  const presence = el("presence");
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   const connIndicator = el("conn-indicator");
   const wakeToggle = el("wake-toggle");
   const chatScroll = el("chat-scroll");
@@ -32,11 +40,32 @@
   const chatInput = el("chat-input");
   const micBtn = el("mic-btn");
   const ttsAudio = el("tts-audio");
+<<<<<<< HEAD
   const quickActions = document.querySelector(".quick-actions");
 
   const coreCanvas = el("core-canvas");
   const chatCorner = el("chat-corner");
   const cornerToggle = el("corner-toggle");
+=======
+
+  const cpuVal = el("cpu-val");
+  const cpuFill = el("cpu-fill");
+  const memVal = el("mem-val");
+  const memFill = el("mem-fill");
+  const activeWindowEl = el("active-window");
+  const batteryVal = el("battery-val");
+
+  const controlLog = el("control-log");
+  const reminderList = el("reminder-list");
+  const reminderText = el("reminder-text");
+  const reminderWhen = el("reminder-when");
+  const reminderAdd = el("reminder-add");
+  const reminderError = el("reminder-error");
+
+  const customSelect = el("custom-action-select");
+  const customValue = el("custom-action-value");
+  const customRun = el("custom-action-run");
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
   let ws = null;
   let reconnectDelay = 1000;
@@ -68,6 +97,13 @@
 
   gateConnect.addEventListener("click", () => {
     const t = gateToken.value.trim();
+<<<<<<< HEAD
+=======
+    if (!t) {
+      gateError.textContent = "Enter a token to continue.";
+      return;
+    }
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     setToken(t);
     connect();
   });
@@ -104,6 +140,13 @@
 
   async function connect() {
     const token = getToken();
+<<<<<<< HEAD
+=======
+    if (!token) {
+      showGate();
+      return;
+    }
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
     connIndicator.dataset.state = "connecting";
     connIndicator.querySelector(".conn-label").textContent = "connecting…";
@@ -130,11 +173,18 @@
 
     ws.onopen = () => {
       showApp();
+<<<<<<< HEAD
       if (core) core.resize();
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
       reconnectDelay = 1000;
       reconnectAttempts = 0;
       connIndicator.dataset.state = "online";
       connIndicator.querySelector(".conn-label").textContent = "online";
+<<<<<<< HEAD
+=======
+      refreshStatusOnce();
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     };
 
     ws.onclose = () => {
@@ -182,18 +232,28 @@
         playAudio(data.audio_url);
         break;
       case "reminder_due":
+<<<<<<< HEAD
         // Reminders can still be created by chat ("remind me to…"),
         // so the due-alert still surfaces here even without a
         // dedicated reminders panel.
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         addBubble("system", `⏰ ${data.text}`);
         playAudio(data.audio_url);
         notify("Shadow reminder", data.text);
         break;
+<<<<<<< HEAD
+=======
+      case "reminders_updated":
+        renderReminders(data.reminders || []);
+        break;
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
       case "conversation_cleared":
         chatScroll.innerHTML = "";
         chatScroll.appendChild(chatEmpty);
         chatEmpty.classList.remove("hidden");
         break;
+<<<<<<< HEAD
       case "error":
         console.error("[Shadow]", data.message || "Unknown error");
         break;
@@ -206,6 +266,16 @@
         } else if (data.result?.status === "error") {
           addBubble("system", data.result.result || "Desktop action failed.");
         }
+=======
+      case "status":
+        renderStatus(data);
+        break;
+      case "desktop_event":
+        handleDesktopEvent(data);
+        break;
+      case "error":
+        logControl(data.message || "Unknown error", "err");
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         break;
       case "pong":
         break;
@@ -215,6 +285,7 @@
   }
 
   // =======================================================
+<<<<<<< HEAD
   // 3D HOLOGRAPHIC CORE
   // =======================================================
   // The previous 2D canvas globe has been replaced with the standalone
@@ -281,6 +352,335 @@
     ttsAudio.src = url;
     ttsAudio.play().catch(() => {});
     ttsAudio.onended = () => setPresence("idle");
+=======
+  // PRESENCE (the signature ring: idle / listening / thinking / speaking)
+  // =======================================================
+    // =======================================================
+  // PRESENCE + TTS AUDIO
+  // =======================================================
+
+  function setPresence(state) {
+    presence.dataset.state = state;
+  }
+
+  // -------------------------------------------------------
+  // TTS AUDIO STATE
+  // -------------------------------------------------------
+
+  let audioUnlocked = false;
+  let pendingAudioUrl = null;
+  let audioRetryTimer = null;
+
+  // -------------------------------------------------------
+  // UNLOCK AUDIO
+  // -------------------------------------------------------
+  //
+  // Chrome requires a user interaction before some kinds of
+  // programmatic audio playback are allowed.
+  //
+  // We unlock Shadow's audio element after the user's first
+  // click/touch/key interaction.
+  //
+
+  function unlockTtsAudio() {
+    if (audioUnlocked || !ttsAudio) return;
+
+    try {
+      // Temporarily remove the source.
+      const oldSrc = ttsAudio.src;
+
+      ttsAudio.removeAttribute("src");
+      ttsAudio.load();
+
+      const promise = ttsAudio.play();
+
+      if (promise && typeof promise.then === "function") {
+
+        promise
+          .then(() => {
+
+            ttsAudio.pause();
+            ttsAudio.currentTime = 0;
+
+            audioUnlocked = true;
+
+            if (oldSrc) {
+              ttsAudio.src = oldSrc;
+            }
+
+            console.debug("[Shadow][audio] audio unlocked");
+
+            flushPendingAudio();
+          })
+          .catch((error) => {
+
+            console.debug(
+              "[Shadow][audio] unlock waiting for user gesture:",
+              error
+            );
+
+          });
+      }
+
+    } catch (error) {
+
+      console.debug(
+        "[Shadow][audio] unlock error:",
+        error
+      );
+    }
+  }
+
+
+  // -------------------------------------------------------
+  // RETRY QUEUE
+  // -------------------------------------------------------
+
+  function scheduleAudioRetry() {
+
+    if (audioRetryTimer) {
+      return;
+    }
+
+    audioRetryTimer = setTimeout(() => {
+
+      audioRetryTimer = null;
+
+      if (!pendingAudioUrl) {
+        return;
+      }
+
+      // Try immediately if the Shadow tab is visible.
+      if (!document.hidden) {
+        const url = pendingAudioUrl;
+
+        pendingAudioUrl = null;
+
+        playAudio(url);
+      }
+
+    }, 700);
+  }
+
+
+  function flushPendingAudio() {
+
+    if (!pendingAudioUrl) {
+      return;
+    }
+
+    const url = pendingAudioUrl;
+
+    pendingAudioUrl = null;
+
+    playAudio(url);
+  }
+
+
+  // -------------------------------------------------------
+  // USER INTERACTION → UNLOCK AUDIO
+  // -------------------------------------------------------
+
+  ["pointerdown", "keydown", "touchstart"].forEach((eventName) => {
+
+    window.addEventListener(
+      eventName,
+      unlockTtsAudio,
+      {
+        capture: true,
+        passive: true
+      }
+    );
+
+  });
+
+
+  // -------------------------------------------------------
+  // PAGE VISIBILITY
+  // -------------------------------------------------------
+
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+
+      console.debug(
+        "[Shadow][audio] visibility:",
+        document.visibilityState
+      );
+
+      if (!document.hidden) {
+        flushPendingAudio();
+      }
+
+    }
+  );
+
+
+  // -------------------------------------------------------
+  // WINDOW FOCUS
+  // -------------------------------------------------------
+
+  window.addEventListener(
+    "focus",
+    () => {
+
+      console.debug("[Shadow][audio] Shadow window focused");
+
+      flushPendingAudio();
+
+    }
+  );
+
+
+  // -------------------------------------------------------
+  // MAIN PLAY AUDIO FUNCTION
+  // -------------------------------------------------------
+
+  function playAudio(url) {
+
+    if (!url) {
+      console.debug("[Shadow][audio] No audio URL");
+      return;
+    }
+
+    console.debug(
+      "[Shadow][audio] attempting playback:",
+      url
+    );
+
+    pendingAudioUrl = url;
+
+    setPresence("speaking");
+
+
+    try {
+
+      // ---------------------------------------------------
+      // CLEAN OLD EVENTS
+      // ---------------------------------------------------
+
+      ttsAudio.onended = null;
+      ttsAudio.onerror = null;
+
+
+      // ---------------------------------------------------
+      // PLAYBACK FINISHED
+      // ---------------------------------------------------
+
+      ttsAudio.onended = () => {
+
+        console.debug(
+          "[Shadow][audio] playback finished"
+        );
+
+        if (pendingAudioUrl === url) {
+          pendingAudioUrl = null;
+        }
+
+        setPresence("idle");
+      };
+
+
+      // ---------------------------------------------------
+      // PLAYBACK ERROR
+      // ---------------------------------------------------
+
+      ttsAudio.onerror = () => {
+
+        console.warn(
+          "[Shadow][audio] audio element error:",
+          ttsAudio.error
+        );
+
+        // Don't permanently keep a broken URL.
+        if (pendingAudioUrl === url) {
+          pendingAudioUrl = null;
+        }
+
+        setPresence("idle");
+      };
+
+
+      // ---------------------------------------------------
+      // LOAD AUDIO
+      // ---------------------------------------------------
+
+      ttsAudio.src = url;
+
+      ttsAudio.load();
+
+
+      // ---------------------------------------------------
+      // START PLAYBACK
+      // ---------------------------------------------------
+
+      const promise = ttsAudio.play();
+
+
+      // Modern Chrome returns a Promise from play().
+      if (promise && typeof promise.then === "function") {
+
+        promise
+
+          .then(() => {
+
+            console.debug(
+              "[Shadow][audio] playback started successfully"
+            );
+
+            audioUnlocked = true;
+
+            if (pendingAudioUrl === url) {
+              pendingAudioUrl = null;
+            }
+
+          })
+
+          .catch((error) => {
+
+            console.warn(
+              "[Shadow][audio] play() failed:",
+              error.name,
+              error.message
+            );
+
+
+            // Keep the audio URL so we can retry.
+            pendingAudioUrl = url;
+
+
+            // If this was an autoplay restriction,
+            // playback will be retried after interaction.
+            if (
+              error.name === "NotAllowedError" ||
+              error.name === "AbortError"
+            ) {
+
+              console.warn(
+                "[Shadow][audio] Chrome blocked automatic playback"
+              );
+
+            }
+
+
+            scheduleAudioRetry();
+
+          });
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "[Shadow][audio] unexpected playback error:",
+        error
+      );
+
+      pendingAudioUrl = url;
+
+      scheduleAudioRetry();
+    }
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   }
 
   // =======================================================
@@ -298,6 +698,7 @@
     scrollToBottom();
   }
 
+<<<<<<< HEAD
   // Solo Leveling "system window" style bubble: a small angular
   // notification label above the message body, rendered inside the
   // cornered chat panel. New messages auto-expand the corner so they
@@ -321,6 +722,13 @@
     body.textContent = text;
     div.appendChild(body);
 
+=======
+  function addBubble(role, text, audioUrl, autoScroll = true) {
+    chatEmpty.classList.add("hidden");
+    const div = document.createElement("div");
+    div.className = `msg ${role}`;
+    div.textContent = text;
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     if (role === "assistant") {
       div.title = "Tap to replay";
       div.addEventListener("click", () => {
@@ -354,6 +762,7 @@
     chatInput.value = "";
   });
 
+<<<<<<< HEAD
   const CONFIRM_ACTIONS = new Set(["restart", "sleep_pc", "stop_server", "close"]);
   quickActions?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
@@ -367,6 +776,8 @@
     send({ type: "action", action, value, confirm });
   });
 
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   // =======================================================
   // VOICE INPUT — wake word ("hey shadow" / "shadow") +
   // manual push-to-talk, both via the browser's Web Speech API.
@@ -394,8 +805,11 @@
   let voiceMode = "off"; // "off" | "wake" | "active" | "transitioning"
   let recognizerRunning = false;
   let pendingMode = null;
+<<<<<<< HEAD
   let finishingSession = false;
   let requestingMicrophone = false;
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   let wakeEnabled = localStorage.getItem(WAKE_KEY) === "1";
 
   const GREET_KEY = "shadow_last_greeting_date";
@@ -479,6 +893,7 @@
     }
   }
 
+<<<<<<< HEAD
   function setVoiceProblem(message) {
     wakeEnabled = false;
     localStorage.setItem(WAKE_KEY, "0");
@@ -524,6 +939,8 @@
     requestMode(mode);
   }
 
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   // Extracted out of onresult so both the wake-word matcher below and
   // any future caller can check EVERY alternative the recognizer
   // returned, not just the top guess. Previously maxAlternatives = 3
@@ -558,11 +975,15 @@
         updateWakeUI();
         return;
       }
+<<<<<<< HEAD
       // Keep manual capture alive through the short pauses that Chrome
       // commonly inserts before it emits a final transcript. The active
       // result handler still submits one final command and switches back
       // to wake/off mode, while an explicit mic click still stops it.
       recognizer.continuous = mode === "wake" || mode === "active";
+=======
+      recognizer.continuous = mode === "wake";
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
       recognizer.interimResults = mode === "wake";
       try {
         recognizer.start();
@@ -600,6 +1021,7 @@
     // and the mic button became permanently unresponsive until the
     // page was reloaded.
     function finishSession() {
+<<<<<<< HEAD
       // Chrome can emit both `error` and `end` for one recognition
       // session.  Starting again from each handler races two calls to
       // recognizer.start(), leaving the recognizer silently stopped.
@@ -624,6 +1046,18 @@
 
     recognizer.onstart = () => {
       finishingSession = false;
+=======
+      recognizerRunning = false;
+      micBtn.classList.remove("recording");
+      if (voiceMode === "active" && presence.dataset.state === "listening") setPresence("idle");
+
+      const next = pendingMode !== null ? pendingMode : (wakeEnabled ? "wake" : "off");
+      pendingMode = null;
+      applyMode(next);
+    }
+
+    recognizer.onstart = () => {
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
       recognizerRunning = true;
       if (voiceMode === "active") {
         micBtn.classList.add("recording");
@@ -641,7 +1075,10 @@
 
     recognizer.onerror = (e) => {
       setPresence("idle");
+<<<<<<< HEAD
       console.warn("[Shadow][voice] recognition error:", e.error);
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         // Mic permission denied - stop trying, don't loop forever.
@@ -650,12 +1087,15 @@
         pendingMode = "off";
         wakeToggle.dataset.state = "blocked";
         wakeToggle.querySelector(".wake-label").textContent = "mic blocked";
+<<<<<<< HEAD
       } else if (e.error === "audio-capture") {
         setVoiceProblem("no microphone found");
       } else if (e.error === "network") {
         // Chrome's recognition engine needs a network connection. Do not
         // endlessly restart it; a new mic/wake click can retry later.
         setVoiceProblem("speech service offline");
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
       }
 
       // FIXED: previously this handler never reset recognizerRunning
@@ -676,11 +1116,15 @@
 
     recognizer.onresult = (event) => {
       if (voiceMode === "active") {
+<<<<<<< HEAD
         const result = event.results[event.results.length - 1];
         // A command must be final before it is sent. This keeps a
         // partial phrase from being submitted as an incomplete request.
         if (!result.isFinal) return;
         const transcript = result[0].transcript.trim();
+=======
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         console.debug("[Shadow][active] command captured:", transcript);
         if (transcript) {
           sendChat(transcript);
@@ -695,11 +1139,14 @@
 
       if (voiceMode === "wake") {
         for (let i = event.resultIndex; i < event.results.length; i++) {
+<<<<<<< HEAD
           // Wake recognition uses interim results for responsiveness,
           // but acting on one cuts off phrases such as "Hey Shadow,
           // what time is it?" as soon as the first two words arrive.
           // Wait for the finalized phrase so its command is preserved.
           if (!event.results[i].isFinal) continue;
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
           // Check every alternative the recognizer offered for this
           // result, not just the top guess - this is what
           // maxAlternatives is actually for. A noisy environment can
@@ -743,6 +1190,7 @@
 
     micBtn.addEventListener("click", () => {
       if (voiceMode === "active") {
+<<<<<<< HEAD
         requestMode(wakeEnabled ? "wake" : "off");
         return;
       }
@@ -757,6 +1205,18 @@
       } else {
         startVoiceFromGesture("wake");
       }
+=======
+        try { recognizer.stop(); } catch (e) {}
+        return;
+      }
+      requestMode("active");
+    });
+
+    wakeToggle.addEventListener("click", () => {
+      wakeEnabled = !wakeEnabled;
+      localStorage.setItem(WAKE_KEY, wakeEnabled ? "1" : "0");
+      requestMode(wakeEnabled ? "wake" : "off");
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
     });
 
     if (wakeEnabled) requestMode("wake");
@@ -770,6 +1230,195 @@
   }
 
   // =======================================================
+<<<<<<< HEAD
+=======
+  // SYSTEM STATUS
+  // =======================================================
+
+  function renderStatus(data) {
+    if (typeof data.cpu === "number") {
+      cpuVal.textContent = `${Math.round(data.cpu)}%`;
+      cpuFill.style.width = `${Math.round(data.cpu)}%`;
+    }
+    if (typeof data.memory === "number") {
+      memVal.textContent = `${Math.round(data.memory)}%`;
+      memFill.style.width = `${Math.round(data.memory)}%`;
+    }
+    activeWindowEl.textContent = data.active_window || "–";
+    batteryVal.textContent = data.battery != null ? `${data.battery}%` : "n/a";
+  }
+
+  async function refreshStatusOnce() {
+    try {
+      const data = await api("/api/status");
+      renderStatus(data);
+    } catch (e) {}
+  }
+
+  // =======================================================
+  // DESKTOP CONTROL
+  // =======================================================
+
+  function logControl(text, cls) {
+    const li = document.createElement("li");
+    li.textContent = text;
+    if (cls) li.className = cls;
+    controlLog.prepend(li);
+    while (controlLog.children.length > 20) controlLog.removeChild(controlLog.lastChild);
+  }
+
+  function handleDesktopEvent(data) {
+    const result = data.result || {};
+    if (result.status === "confirm_required") {
+      showConfirm(data.action, data.value);
+      return;
+    }
+    if (result.status === "error") {
+      logControl(`✕ ${data.action}: ${result.result}`, "err");
+    } else {
+      logControl(`✓ ${result.result || data.action}`, "ok");
+    }
+  }
+
+  function runAction(action, value, confirm = false) {
+    send({ type: "action", action, value, confirm });
+  }
+
+  document.querySelectorAll(".action-grid button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      runAction(btn.dataset.action, btn.dataset.value || null, false);
+    });
+  });
+
+  customRun.addEventListener("click", () => {
+    const action = customSelect.value;
+    const value = customValue.value.trim();
+    runAction(action, value || null, false);
+  });
+
+  // ---- confirm modal for dangerous / lifecycle actions ----
+  const ACTION_LABELS = {
+    stop_server: "stop the server",
+    restart: "restart the PC",
+    sleep_pc: "put the PC to sleep",
+    close: "close that app",
+  };
+
+  function showConfirm(action, value) {
+    const label = ACTION_LABELS[action] || action.replace(/_/g, " ");
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-card">
+        <h2>Confirm: ${label}</h2>
+        <p>${action === "stop_server"
+          ? "This stops Shadow's server on this PC (not the PC itself). Every connected device will disconnect."
+          : "This will affect the host PC directly."} Are you sure?</p>
+        <div class="confirm-actions">
+          <button class="confirm-no">Cancel</button>
+          <button class="confirm-yes">Yes, ${label}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector(".confirm-no").addEventListener("click", () => overlay.remove());
+    overlay.querySelector(".confirm-yes").addEventListener("click", () => {
+      runAction(action, value, true);
+      overlay.remove();
+    });
+  }
+
+  // =======================================================
+  // REMINDERS
+  // =======================================================
+
+  function setReminderError(msg) {
+    if (!msg) {
+      reminderError.classList.add("hidden");
+      reminderError.textContent = "";
+      return;
+    }
+    reminderError.textContent = msg;
+    reminderError.classList.remove("hidden");
+  }
+
+  function renderReminders(reminders) {
+    reminderList.innerHTML = "";
+    if (!reminders.length) {
+      const li = document.createElement("li");
+      li.className = "empty-hint";
+      li.textContent = "No reminders yet.";
+      reminderList.appendChild(li);
+      return;
+    }
+    reminders.forEach((r) => {
+      const li = document.createElement("li");
+      li.className = "reminder-item";
+      const when = new Date(r.time * 1000);
+      li.innerHTML = `
+        <div>
+          <span class="r-text"></span>
+          <span class="r-time"></span>
+        </div>
+        <button title="Delete">✕</button>
+      `;
+      li.querySelector(".r-text").textContent = r.text;
+      li.querySelector(".r-time").textContent = when.toLocaleString();
+      li.querySelector("button").addEventListener("click", async () => {
+        try {
+          await api(`/api/reminders/${encodeURIComponent(r.id)}`, { method: "DELETE" });
+        } catch (e) {
+          logControl(`Couldn't delete reminder: ${e.message}`, "err");
+        }
+      });
+      reminderList.appendChild(li);
+    });
+  }
+
+  reminderAdd.addEventListener("click", async () => {
+    const text = reminderText.value.trim();
+    const when = reminderWhen.value.trim();
+
+    setReminderError(null);
+    if (!text) {
+      setReminderError("Enter what to remind you about.");
+      return;
+    }
+    if (!when) {
+      setReminderError("Enter when — e.g. 'in 10 minutes' or 'at 6pm'.");
+      return;
+    }
+
+    reminderAdd.disabled = true;
+    try {
+      await api("/api/reminders", { method: "POST", body: JSON.stringify({ text, when }) });
+      reminderText.value = "";
+      reminderWhen.value = "";
+      // reminders_updated will arrive over the WebSocket and re-render
+      // the list; if the socket happens to be down, fall back to a
+      // direct fetch so the new reminder still shows up.
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        try {
+          renderReminders(await api("/api/reminders"));
+        } catch (e) {}
+      }
+    } catch (e) {
+      setReminderError(e.message || "Couldn't add that reminder.");
+    } finally {
+      reminderAdd.disabled = false;
+    }
+  });
+
+  [reminderText, reminderWhen].forEach((input) => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") reminderAdd.click();
+    });
+    input.addEventListener("input", () => setReminderError(null));
+  });
+
+  // =======================================================
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   // NOTIFICATIONS
   // =======================================================
 
@@ -783,6 +1432,27 @@
   }
 
   // =======================================================
+<<<<<<< HEAD
+=======
+  // MOBILE TAB SWITCHING
+  // =======================================================
+
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  const panels = document.querySelectorAll(".panel");
+
+  function setActivePanel(name) {
+    panels.forEach((p) => p.dataset.active = String(p.dataset.panelName === name));
+    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.panel === name));
+  }
+
+  tabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => setActivePanel(btn.dataset.panel));
+  });
+
+  setActivePanel("chat");
+
+  // =======================================================
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
   // BOOT
   // =======================================================
 
@@ -791,4 +1461,8 @@
   } else {
     showGate();
   }
+<<<<<<< HEAD
 })();
+=======
+})();
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

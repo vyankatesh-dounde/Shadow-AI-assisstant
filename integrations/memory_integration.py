@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 from datetime import date, timedelta
 
+=======
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 from core.memory import load_facts
 from core.memory_extractor import extract_and_store, build_fact_ack
 from integrations.daily_memory import (
@@ -61,11 +64,18 @@ def build_memory_context() -> str:
 
 
 def get_daily_memory():
+<<<<<<< HEAD
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     daily = load_daily_summary(yesterday)
 
     if daily:
         summary = daily.get("summary")
+=======
+    daily = load_daily_summary()
+
+    if daily:
+        summary = daily.get("last_summary")
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
         if summary:
             return f"You seemed busy yesterday… {summary}"
 
@@ -73,4 +83,8 @@ def get_daily_memory():
 
 
 def remember_today(conversation):
+<<<<<<< HEAD
     _save_daily_summary(conversation)
+=======
+    _save_daily_summary(conversation)
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552

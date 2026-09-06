@@ -16,10 +16,14 @@ SAFE_OPERATORS = {
 def safe_eval(expr):
     def _eval(node):
         if isinstance(node, ast.Constant):
+<<<<<<< HEAD
             # bool is an int subclass, but it is not a mathematical input.
             if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
                 raise TypeError(node)
             return node.value
+=======
+            return node.n
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
         elif isinstance(node, ast.BinOp):
             return SAFE_OPERATORS[type(node.op)](
@@ -35,6 +39,7 @@ def safe_eval(expr):
         raise TypeError(node)
 
     tree = ast.parse(expr, mode="eval")
+<<<<<<< HEAD
     result = _eval(tree.body)
     if not isinstance(result, (int, float)) or isinstance(result, bool):
         raise TypeError(result)
@@ -44,6 +49,9 @@ def safe_eval(expr):
 def _display_number(value):
     """Return integral floats without assuming every result is a float."""
     return int(value) if isinstance(value, float) and value.is_integer() else value
+=======
+    return _eval(tree.body)
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
 # =========================
 # 🧠 DETECT MATH QUERY (SAFE)
@@ -98,7 +106,11 @@ def solve_math(text: str):
             a, b = match.groups()[1:]
             result = float(a) * float(b)
             last_result = result
+<<<<<<< HEAD
             return _display_number(result)
+=======
+            return int(result) if result.is_integer() else result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
         # divide X by Y
         match = re.search(r'(divide|divided)\s+(\d+)\s+by\s+(\d+)', text)
@@ -106,7 +118,11 @@ def solve_math(text: str):
             a, b = match.groups()[1:]
             result = float(a) / float(b)
             last_result = result
+<<<<<<< HEAD
             return _display_number(result)
+=======
+            return int(result) if result.is_integer() else result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
         # =========================
         # 🔁 FOLLOW-UP USING LAST RESULT
@@ -119,28 +135,44 @@ def solve_math(text: str):
                 nums = re.findall(r'\d+', text)
                 if nums:
                     last_result += float(nums[0])
+<<<<<<< HEAD
                     return _display_number(last_result)
+=======
+                    return int(last_result) if last_result.is_integer() else last_result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
             # subtract
             if "subtract" in text or "minus" in text:
                 nums = re.findall(r'\d+', text)
                 if nums:
                     last_result -= float(nums[0])
+<<<<<<< HEAD
                     return _display_number(last_result)
+=======
+                    return int(last_result) if last_result.is_integer() else last_result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
             # multiply
             if "multiply" in text or "multiplied" in text or "times" in text:
                 nums = re.findall(r'\d+', text)
                 if nums:
                     last_result *= float(nums[0])
+<<<<<<< HEAD
                     return _display_number(last_result)
+=======
+                    return int(last_result) if last_result.is_integer() else last_result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
             # divide
             if "divide" in text or "divided" in text:
                 nums = re.findall(r'\d+', text)
                 if nums:
                     last_result /= float(nums[0])
+<<<<<<< HEAD
                     return _display_number(last_result)
+=======
+                    return int(last_result) if last_result.is_integer() else last_result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
         # =========================
         # 🧠 NORMALIZE TEXT
@@ -178,9 +210,14 @@ def solve_math(text: str):
         # =========================
 
         text = re.sub(r'[^0-9+\-*/(). ]', '', text)
+<<<<<<< HEAD
         text = text.strip()
 
         if not text:
+=======
+
+        if not text.strip():
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
             return None
 
         # =========================
@@ -191,7 +228,11 @@ def solve_math(text: str):
 
         last_result = result
 
+<<<<<<< HEAD
         return _display_number(result)
+=======
+        return int(result) if result.is_integer() else result
+>>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
 
     except Exception:
         return None
