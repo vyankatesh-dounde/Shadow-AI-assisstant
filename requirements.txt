@@ -1,12 +1,14 @@
-# Web server
+# Core web stack
 fastapi
 uvicorn[standard]
 
-# AI backend / voice / TTS
-edge-tts
+# Local AI and HTTP calls
 requests
 
-# Desktop control (Windows)
+# Text-to-speech
+edge-tts
+
+# Windows desktop automation and status monitoring
 pyautogui
 psutil
 pygetwindow
