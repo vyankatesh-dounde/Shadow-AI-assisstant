@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Shadow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css" />
+<!-- Three.js example modules import the bare specifier "three" internally.
+     Map it before app.js loads so EffectComposer/RenderPass/Bloom resolve in
+     a browser instead of failing with "Failed to resolve module specifier". -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ============ TOKEN GATE (shown until a valid token is stored) ============ -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <div class="gate-ring"><div class="ring-core"></div></div>
+    <h1>Shadow</h1>
+    <p class="gate-sub">Enter the access token configured in <code>config.py</code> to connect from this device.</p>
+    <input id="gate-token" type="password" placeholder="Access token" autocomplete="off" />
+    <button id="gate-connect">Connect</button>
+    <p id="gate-error" class="gate-error"></p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL — full-bleed core stage + cornered chat ============ -->
+<div id="app" class="app hidden">
+
+  <!-- Minimal floating status — no logo/branding, just wake-word
+       toggle + connection dot, overlaid on the core stage. -->
+  <div class="hud">
+    <button id="wake-toggle" class="wake-toggle" data-state="off" title="Toggle wake-word listening">
+      <span class="wake-dot"></span>
+      <span class="wake-label">wake word: off</span>
+    </button>
+    <div class="conn" id="conn-indicator" data-state="connecting">
+      <span class="dot"></span>
+      <span class="conn-label">connecting…</span>
+    </div>
+  </div>
+
+  <main class="stage-shell">
+
+    <!-- Holographic core: main visual focus of the app. Pinch (touch)
+         or scroll wheel (desktop) scales it; a one-finger / mouse
+         drag rotates it; double-tap resets. -->
+    <div class="core-stage" id="core-stage">
+      <canvas id="core-canvas"></canvas>
+      <p class="core-hint">drag to rotate · scroll to zoom · double-click to reset</p>
+    </div>
+
+    <!-- Chat, docked to the corner instead of owning the page.
+         Collapsed by default; expands automatically on any new
+         message, and can be toggled by tapping the pill. -->
+    <div class="chat-corner" id="chat-corner" data-expanded="false">
+      <button type="button" class="corner-toggle" id="corner-toggle" aria-label="Toggle chat log">
+        <span class="corner-toggle-dot"></span>
+        <span class="corner-toggle-label">Shadow log</span>
+      </button>
+
+      <div class="corner-body" id="corner-body">
+        <div class="corner-scroll" id="chat-scroll">
+          <div class="chat-empty" id="chat-empty">
+            <p>Say "Hey Shadow" or tap the mic, or just type below.</p>
+          </div>
+        </div>
+
+        <form class="composer" id="composer">
+          <button type="button" class="mic-btn" id="mic-btn" title="Voice input" aria-label="Voice input">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/>
+              <path d="M19 11a7 7 0 0 1-14 0"/>
+              <path d="M12 18v3"/>
+            </svg>
+          </button>
+          <input id="chat-input" type="text" placeholder="Message Shadow…" autocomplete="off" />
+          <button type="submit" class="send-btn" aria-label="Send">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/>
+            </svg>
+          </button>
+        </form>
+        <div class="quick-actions" aria-label="Desktop controls">
+          <button type="button" data-action="open" data-value="chrome">Open Chrome</button>
+          <button type="button" data-action="volume_up">Volume +</button>
+          <button type="button" data-action="volume_down">Volume −</button>
+          <button type="button" data-action="restart" class="danger">Restart PC</button>
+          <button type="button" data-action="sleep_pc" class="danger">Sleep PC</button>
+          <button type="button" data-action="stop_server" class="danger">Stop Shadow</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<audio id="tts-audio" preload="none"></audio>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

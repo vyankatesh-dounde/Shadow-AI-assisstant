@@ -1,0 +1,571 @@
+/* =========================================================
+   SHADOW — design tokens
+   A quiet, near-black console rather than pure black/acid-green:
+   a deep navy void, a cyan→violet duotone for Shadow's "presence"
+   (idle / listening / thinking / speaking), Space Grotesk for
+   display type, Inter for body/UI, JetBrains Mono for live
+   system readouts so data reads distinctly from conversation.
+   ========================================================= */
+
+:root {
+  --void: #0b0e14;
+  --panel: #12151f;
+  --panel-raised: #171b28;
+  --panel-line: #232838;
+
+  --ink: #e7eaf2;
+  --ink-dim: #a9afc2;
+  --muted: #6d7488;
+
+  --cyan: #3ed9c8;
+  --violet: #8b7cf6;
+  --duotone: linear-gradient(135deg, var(--cyan), var(--violet));
+
+  --danger: #ff6b6b;
+  --danger-dim: #4a2a2c;
+  --success: #4ade80;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 50% 35%, rgba(255, 140, 40, 0.05), transparent 60%);
+  background-attachment: fixed;
+}
+
+button, input, select {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid #ff9d3d;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.hidden { display: none !important; }
+
+/* =========================================================
+   TOKEN GATE
+   ========================================================= */
+
+.gate {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.gate-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  text-align: center;
+}
+
+.gate-ring {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9d3d, #ff6b1a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: gate-pulse 2.6s ease-in-out infinite;
+}
+.gate-ring .ring-core {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--void);
+}
+@keyframes gate-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+}
+
+.gate-card h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  margin: 0 0 8px;
+  letter-spacing: 0.02em;
+}
+
+.gate-sub {
+  color: var(--ink-dim);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+.gate-sub code {
+  font-family: var(--font-mono);
+  background: var(--panel-raised);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+#gate-token {
+  width: 100%;
+  background: var(--panel-raised);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--ink);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+#gate-connect {
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #ff9d3d, #ff6b1a);
+  color: #1a0e04;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+#gate-connect:hover { opacity: 0.92; }
+#gate-connect:active { transform: scale(0.98); }
+
+.gate-error {
+  color: var(--danger);
+  font-size: 12.5px;
+  min-height: 16px;
+  margin: 10px 0 0;
+}
+
+/* =========================================================
+   APP SHELL
+   ========================================================= */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* =========================================================
+   HUD — minimal floating status cluster. No logo/branding; just
+   the wake-word toggle and connection dot, overlaid top-right on
+   the core stage instead of owning a full header bar.
+   ========================================================= */
+
+.hud {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@keyframes core-breathe {
+  0%, 100% { transform: scale(0.85); }
+  50% { transform: scale(1.05); }
+}
+
+.conn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  background: rgba(11, 14, 20, 0.7);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  backdrop-filter: blur(6px);
+}
+.conn .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.conn[data-state="online"] .dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.conn[data-state="connecting"] .dot { background: #d9a441; animation: core-breathe 1s ease-in-out infinite; }
+.conn[data-state="offline"] .dot { background: var(--danger); }
+
+.wake-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  background: var(--panel-raised);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.wake-toggle:hover { border-color: #ff9d3d; color: var(--ink); }
+.wake-toggle .wake-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.wake-toggle[data-state="on"] {
+  border-color: rgba(255, 157, 61, 0.35);
+  color: var(--ink);
+}
+.wake-toggle[data-state="on"] .wake-dot {
+  background: #ff9d3d;
+  box-shadow: 0 0 6px #ff9d3d;
+}
+.wake-toggle[data-state="listening"] .wake-dot {
+  background: #ffd28a;
+  box-shadow: 0 0 6px #ffd28a;
+  animation: core-breathe 0.9s ease-in-out infinite;
+}
+.wake-toggle[data-state="blocked"] .wake-dot { background: var(--danger); }
+
+/* =========================================================
+   STAGE — full-bleed area holding the core + cornered chat.
+   Left/right panels (status, quick actions, reminders) have been
+   removed entirely; this is the whole app now.
+   ========================================================= */
+
+.stage-shell {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  --core-amber: 255, 157, 61;
+  --core-violet: 139, 124, 246;
+}
+
+/* =========================================================
+   HOLOGRAPHIC CORE — Ultron/JARVIS-style tactical globe.
+   Fills the whole center panel; the canvas itself is drawn and
+   gesture-driven from app.js (UltronCore class). Pinch/scroll
+   scales it, drag rotates it — this is the app's hero surface now,
+   not a decorative corner widget.
+   ========================================================= */
+
+.core-stage {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 140, 40, 0.05), transparent 55%);
+}
+.core-stage:active { cursor: grabbing; }
+
+#core-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+.core-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 140, 40, 0.045), transparent 56%);
+}
+
+.core-hint {
+  position: absolute;
+  z-index: 10;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  opacity: 0.65;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.core-fallback {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* =========================================================
+   CORNERED CHAT — docked bottom-right over the core, Solo
+   Leveling "system window" aesthetic, recolored amber/orange.
+   ========================================================= */
+
+.chat-corner {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 360px;
+  max-width: calc(100vw - 40px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.corner-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(14, 9, 4, 0.85);
+  border: 1px solid rgba(255, 157, 61, 0.4);
+  color: #ffbd80;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.corner-toggle:hover { border-color: rgba(255, 157, 61, 0.8); color: #ffdcae; }
+.corner-toggle-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff9d3d;
+  box-shadow: 0 0 8px #ff9d3d;
+  flex-shrink: 0;
+}
+.chat-corner[data-expanded="true"] .corner-toggle-dot {
+  animation: core-breathe 1s ease-in-out infinite;
+}
+
+.corner-body {
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(10px);
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(.16,1,.3,1), opacity 0.25s ease, transform 0.3s ease;
+  background: rgba(10, 7, 4, 0.78);
+  border: 1px solid rgba(255, 157, 61, 0.28);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 30px rgba(255, 120, 20, 0.08);
+}
+
+.chat-corner[data-expanded="true"] .corner-body {
+  max-height: min(62vh, 540px);
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.corner-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 46vh;
+}
+
+.chat-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 20px 10px;
+}
+
+/* ---- Solo Leveling style system-window notification, amber ---- */
+
+.msg {
+  position: relative;
+  max-width: 92%;
+  padding: 10px 14px 11px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #ffe3bd;
+  background: linear-gradient(135deg, rgba(30, 16, 4, 0.92), rgba(12, 7, 2, 0.94));
+  border: 1px solid rgba(255, 157, 61, 0.5);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: 0 0 0 1px rgba(255, 140, 20, 0.06), 0 0 16px rgba(255, 140, 20, 0.16);
+  animation: sl-in 0.32s cubic-bezier(.16,1,.3,1);
+}
+
+.msg-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: #ff9d3d;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.msg-body {
+  display: block;
+  white-space: pre-wrap;
+}
+
+@keyframes sl-in {
+  0% { opacity: 0; transform: translateX(18px) scale(0.97); filter: brightness(1.6); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateX(0) scale(1); filter: brightness(1); }
+}
+
+.msg.user {
+  align-self: flex-end;
+  border-color: rgba(255, 157, 61, 0.3);
+  color: #f0d3a8;
+}
+.msg.user .msg-label { color: #d99a54; }
+
+.msg.assistant {
+  align-self: flex-start;
+  border-color: rgba(255, 157, 61, 0.6);
+  cursor: pointer;
+}
+.msg.assistant:hover { border-color: #ff9d3d; box-shadow: 0 0 0 1px rgba(255,140,20,0.1), 0 0 22px rgba(255, 140, 20, 0.3); }
+
+.msg.system {
+  align-self: center;
+  background: none;
+  border-color: rgba(255, 157, 61, 0.25);
+  color: var(--muted);
+  font-size: 11px;
+  clip-path: none;
+  box-shadow: none;
+}
+.msg.system .msg-label { color: var(--muted); }
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 157, 61, 0.18);
+  flex-shrink: 0;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 12px;
+}
+
+.quick-actions button {
+  border: 1px solid rgba(255, 157, 61, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 157, 61, 0.08);
+  color: #ffbd80;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 6px 9px;
+}
+
+.quick-actions button:hover { border-color: #ff9d3d; }
+.quick-actions button.danger { color: #ffb0a7; border-color: rgba(255, 107, 107, 0.38); }
+
+#chat-input {
+  flex: 1;
+  background: var(--panel-raised);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 14.5px;
+}
+
+.mic-btn, .send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 157, 61, 0.3);
+  background: rgba(255, 157, 61, 0.08);
+  color: #ffbd80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.mic-btn:hover, .send-btn:hover { border-color: #ff9d3d; color: #ffdcae; }
+.mic-btn.recording {
+  background: linear-gradient(135deg, #ff9d3d, #ff6b1a);
+  color: #1a0e04;
+  border-color: transparent;
+  animation: core-breathe 0.9s ease-in-out infinite;
+}
+.send-btn { background: linear-gradient(135deg, #ff9d3d, #ff6b1a); color: #1a0e04; border: none; }
+
+#chat-input {
+  background: rgba(255, 157, 61, 0.06);
+  border: 1px solid rgba(255, 157, 61, 0.25);
+}
+#chat-input:focus { border-color: rgba(255, 157, 61, 0.6); }
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 980px) {
+  .hud { top: 12px; right: 12px; gap: 8px; }
+  .wake-toggle .wake-label { display: none; }
+
+  .chat-corner { right: 12px; bottom: 12px; width: 300px; }
+  .corner-body { max-height: min(70vh, 480px); }
+  .corner-scroll { max-height: 54vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}

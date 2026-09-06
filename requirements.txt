@@ -1,0 +1,12 @@
+# Web server
+fastapi
+uvicorn[standard]
+
+# AI backend / voice / TTS
+edge-tts
+requests
+
+# Desktop control (Windows)
+pyautogui
+psutil
+pygetwindow
