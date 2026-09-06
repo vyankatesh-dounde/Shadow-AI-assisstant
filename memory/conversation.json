@@ -1,17 +1,5 @@
 [
   {
-    "role": "user",
-    "content": "are you connected to the LLM"
-  },
-  {
-    "role": "assistant",
-    "content": "What should I search for?"
-  },
-  {
-    "role": "user",
-    "content": "are you connected to the LLM"
-  },
-  {
     "role": "assistant",
     "content": "What should I search for?"
   },
@@ -46,5 +34,17 @@
   {
     "role": "user",
     "content": "he shadow"
+  },
+  {
+    "role": "user",
+    "content": "are you connected to the LLM model"
+  },
+  {
+    "role": "user",
+    "content": "search for Spider-Man"
+  },
+  {
+    "role": "assistant",
+    "content": "Web results for: Spider-Man\n1. Spider-Man\n   https://en.wikipedia.org/wiki/Spider-Man\n   Spider-Man is a superhero in American comic books published by Marvel Comics. Created by writer-editor Stan Lee and artist Steve Ditko, he first appeared in the anthology comic book Amazing Fantasy #15 in the Silver Age of Comic Books. Widely regarded as one of the most popular and commercially successful superheroes, he has been featured in comic books, television shows, films, video games, novels, and plays. Spider-Man's secret identity is Peter Benjamin Parker, who was raised by his Aunt May and Uncle Ben in Queens, New York City, after the death of his parents. Lee, Ditko, and later writers had the character deal with the struggles of adolescence and young adulthood. Readers identified with his self-doubt and loneliness. Unlike previous teen heroes, Spider-Man would be given many supporting characters.\n2. Spider-Man Category\n   https://duckduckgo.com/c/Spider-Man\n   Spider-Man Category\n3. Spiders in popular culture\n   https://duckduckgo.com/c/Spiders_in_popular_culture\n   Spiders in popular culture\n4. Comics by Stan Lee\n   https://duckduckgo.com/c/Comics_by_Stan_Lee\n   Comics by Stan Lee\n5. Comics by Steve Ditko\n   https://duckduckgo.com/c/Comics_by_Steve_Ditko\n   Comics by Steve Ditko"
   }
 ]
