@@ -1,0 +1,14 @@
+{
+  "favorite": "movies",
+  "mood": "neutral",
+  "like": [
+    "pizza",
+    "maggi",
+    "to watch anime"
+  ],
+  "dislike": [
+    "movies",
+    "green vegetables",
+    "Beatles"
+  ]
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "role": "user",
+    "content": "search the web for movies"
+  },
+  {
+    "role": "assistant",
+    "content": "Google results for: movies\n1. Movies Anywhere\n   https://moviesanywhere.com › ...\n   Watch movies online with Movies Anywhere. Stream movies from Disney, 20th Century, Sony, Universal, Warner Bros. and Lionsgate. Movie Tickets Online Booking & Showtimes near you in India BookMyShow\n2. BookMyShow\n   https://in.bookmyshow.com › explore › movies\n   Online movie ticket bookings for the Bollywood, Hollywood, Tamil, Telugu and other regional films showing near you in India. IMDb Top 250 movies IMDb\n3. IMDb\n   https://www.imdb.com › chart › top\n   IMDb Top 250 movies · Tim Robbins in The Shawshank Redemption (1994) · Marlon Brando in The Godfather (1972) · Christian Bale in The Dark Knight (2008) · Al ...Read more What are the top 10 films right now? What are the latest OTT releases?\n4. Netflix\n   https://www.netflix.com › browse › genre\n   Blockbuster Movies · Black Adam · The Fast and the Furious · Jurassic World Rebirth · The Hunger Games · Furious 7 · War Machine · Fast Five · Happy Gilmore 2.Read more movies from www.netflix.com Movies & TV YouTube\n5. YouTube\n   https://www.youtube.com › feed › storefront\n   Find the latest and greatest movies and shows all available on YouTube.com/movies. From award-winning hits to independent releases, watch on any device and ... movies from www.youtube.com Browse Movies and TV Shows by Genre"
+  },
+  {
+    "role": "user",
+    "content": "search the web for anime"
+  },
+  {
+    "role": "assistant",
+    "content": "Google results for: anime\n1. Netflix\n   https://www.netflix.com › browse › genre\n   Anime Action-packed adventures, offbeat comedies, inspirational stories -- these anime movies and TV shows have a style and spirit unlike anything else. anime from www.netflix.com Anime.js | JavaScript Animation Engine Anime.js\n2. Anime.js\n   https://animejs.com\n   A fast, multipurpose and lightweight JavaScript animation library. All-in-one animation engine. JavaScript library to animate the web. Anime.js is 100% free Crunchyroll: Anime Streaming - Apps on Google Play Google Play\n3. Google Play\n   https://play.google.com › store › apps › details\n   Crunchyroll offers the largest anime collection online, Watch anime ad-free and in high quality—all in one place. anime from play.google.com 4.6(42,92,550) · Free · ‎Android · ‎Entertainment Top Anime Series IMDb\n4. IMDb\n   https://www.imdb.com › list\n   Top Anime Series · 1. Gurren Lagann · 2. Fullmetal Alchemist · 3. Eureka Seven · 4. Code Geass: Lelouch of the Rebellion · 5. Mobile Suit Gundam 00 · 6. Kill La ...Read more anime from www.imdb.com Yomi — Watch Anime Free\n5. Yomi\n   https://yomi.to\n   Stream anime free with built-in filler guides, auto skip controls, and seasonal calendar. no ads, no account required. Who is the top 10 best anime? What is the top 20 anime? Which anime is No. 1 now?"
+  },
+  {
+    "role": "user",
+    "content": "anime"
+  },
+  {
+    "role": "user",
+    "content": "anime"
+  },
+  {
+    "role": "user",
+    "content": "hello"
+  },
+  {
+    "role": "user",
+    "content": "shut down"
+  },
+  {
+    "role": "user",
+    "content": "hello"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "are you connected to the LLM"
+  }
+]
