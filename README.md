@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Shadow
 
 Shadow is a locally hosted Windows assistant with a browser dashboard, voice input, reminders, local Ollama replies, and a Three.js hologram.
@@ -196,10 +195,3 @@ always-listening desktop process to worry about racing with it, since
 =======
 # Shadow-AI-assisstant
 Shadow is a locally-hosted, voice-activated AI assistant you're building that runs entirely on your own Windows PC and is accessible from any device on your home network — phone, tablet, laptop — through a browser, with no installs needed on those other devices.
->>>>>>> 2d86bee20ac872666b1427d50322d9f9e69e35af
-"# Shadow-AI-assisstant" 
-"# Shadow-AI-assisstant" 
-"# Shadow-AI-assisstant" 
-"# Shadow-AI-assisstant" 
-"# Shadow-AI-assisstant" 
->>>>>>> e5723e5c72817929ddcb45caa8d594873b1c6552
