@@ -2,8 +2,9 @@ ASSISTANT_NAME = "Shadow"
 
 DEFAULT_MODE = "assistant"
 
-VOICE = "en-US-GuyNeural"
+VOICE = "ja-JP-NanamiNeural"
 VOICE_PITCH = "-2Hz"
+USE_RVC_VOICE = False
 
 OLLAMA_MODEL = "phi3"
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -57,7 +58,7 @@ ALLOWED_ORIGINS = ["*"]
 # before core/desktop_control.py (or core/server_control.py) will run
 # them. "stop_server" replaces the old "shutdown" action - it stops
 # THIS process, not the Windows PC.
-CONFIRM_REQUIRED_ACTIONS = {"stop_server", "restart", "sleep_pc", "close"}
+CONFIRM_REQUIRED_ACTIONS = {"stop_server", "restart", "sleep_shadow", "sleep_pc", "close"}
 
 # How often (seconds) the server checks for due reminders and pushes
 # them to all connected clients.

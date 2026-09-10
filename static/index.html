@@ -6,7 +6,7 @@
 <title>Shadow</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/style.css" />
+<link rel="stylesheet" href="/static/css/style.css?v=20260910" />
 <!-- Three.js example modules import the bare specifier "three" internally.
      Map it before app.js loads so EffectComposer/RenderPass/Bloom resolve in
      a browser instead of failing with "Failed to resolve module specifier". -->
@@ -25,8 +25,8 @@
   <div class="gate-card">
     <div class="gate-ring"><div class="ring-core"></div></div>
     <h1>Shadow</h1>
-    <p class="gate-sub">Enter the access token configured in <code>config.py</code> to connect from this device.</p>
-    <input id="gate-token" type="password" placeholder="Access token" autocomplete="off" />
+    <p class="gate-sub">Enter the access token configured in <code>config.py</code>, if authentication is enabled.</p>
+    <input id="gate-token" type="password" placeholder="Access token (optional)" autocomplete="off" />
     <button id="gate-connect">Connect</button>
     <p id="gate-error" class="gate-error"></p>
   </div>
@@ -50,6 +50,29 @@
 
   <main class="stage-shell">
 
+    <aside class="side-panel left-panel" aria-label="System controls">
+      <div class="panel-heading">
+        <div><span class="eyebrow">SYSTEM</span><h2>Shadow link</h2></div>
+        <span class="panel-pulse" title="Shadow link online"></span>
+      </div>
+      <div class="status-stack">
+        <div class="metric-row" title="CPU usage"><span class="metric-icon" aria-hidden="true">CPU</span><div class="metric-label"><span>CPU</span><strong id="cpu-val">--</strong></div><div class="meter"><span id="cpu-fill"></span></div></div>
+        <div class="metric-row" title="Memory usage"><span class="metric-icon" aria-hidden="true">RAM</span><div class="metric-label"><span>Memory</span><strong id="mem-val">--</strong></div><div class="meter"><span id="mem-fill"></span></div></div>
+        <div class="readout-row" title="Battery"><span class="metric-icon" aria-hidden="true">BAT</span><span>Battery</span><strong id="battery-val">n/a</strong></div>
+        <div class="readout-row" title="System uptime"><span class="metric-icon" aria-hidden="true">UP</span><span>Uptime</span><strong id="uptime-val">--</strong></div>
+        <div class="window-readout" title="Active window"><span class="metric-icon" aria-hidden="true">APP</span><span>Active window</span><strong id="active-window">Waiting for status…</strong></div>
+      </div>
+      <div class="panel-section power-section">
+        <div class="section-title"><span class="eyebrow">POWER</span><span class="confirm-tag">CONFIRM</span></div>
+        <div class="power-actions">
+          <button type="button" data-action="sleep_shadow" title="Stop current Shadow task" aria-label="Stop current Shadow task"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></svg></button>
+          <button type="button" data-action="restart" title="Restart Shadow" aria-label="Restart Shadow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.7-4L3 10"/><path d="M3 5v5h5"/><path d="M4 13a8 8 0 0 0 14.7 4L21 14"/><path d="M21 19v-5h-5"/></svg></button>
+          <button type="button" data-action="stop_server" title="Stop Shadow" aria-label="Stop Shadow"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+        </div>
+      </div>
+      <div class="panel-section activity-section"><span class="eyebrow">ACTIVITY</span><ul id="control-log" class="control-log"><li class="empty-hint">No actions yet.</li></ul></div>
+    </aside>
+
     <!-- Holographic core: main visual focus of the app. Pinch (touch)
          or scroll wheel (desktop) scales it; a one-finger / mouse
          drag rotates it; double-tap resets. -->
@@ -57,6 +80,14 @@
       <canvas id="core-canvas"></canvas>
       <p class="core-hint">drag to rotate · scroll to zoom · double-click to reset</p>
     </div>
+
+    <aside class="side-panel right-panel" aria-label="Memory and reminders">
+      <section class="insight-card relationship-card">
+        <div class="panel-heading compact"><span class="eyebrow">RELATIONSHIP</span><span class="level-badge" id="relationship-level">--</span></div>
+        <div class="relationship-score"><strong id="relationship-points">0</strong><span>connection points</span></div><div class="progress-track"><span id="relationship-progress"></span></div>
+        <p id="relationship-last" class="subtle-copy">No recent interaction.</p>
+      </section>
+    </aside>
 
     <!-- Chat, docked to the corner instead of owning the page.
          Collapsed by default; expands automatically on any new
@@ -89,14 +120,6 @@
             </svg>
           </button>
         </form>
-        <div class="quick-actions" aria-label="Desktop controls">
-          <button type="button" data-action="open" data-value="chrome">Open Chrome</button>
-          <button type="button" data-action="volume_up">Volume +</button>
-          <button type="button" data-action="volume_down">Volume −</button>
-          <button type="button" data-action="restart" class="danger">Restart PC</button>
-          <button type="button" data-action="sleep_pc" class="danger">Sleep PC</button>
-          <button type="button" data-action="stop_server" class="danger">Stop Shadow</button>
-        </div>
       </div>
     </div>
 
@@ -105,6 +128,6 @@
 
 <audio id="tts-audio" preload="none"></audio>
 
-<script type="module" src="/static/js/app.js"></script>
+<script type="module" src="/static/js/app.js?v=20260910"></script>
 </body>
 </html>

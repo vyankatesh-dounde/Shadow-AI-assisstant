@@ -337,6 +337,121 @@ button, input, select {
 }
 
 /* =========================================================
+   DASHBOARD PANELS — compact controls frame the hologram while
+   the existing corner chat remains the primary conversation surface.
+   ========================================================= */
+
+.side-panel {
+  position: absolute;
+  top: 14px;
+  z-index: 12;
+  width: auto;
+  padding: 10px;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  backdrop-filter: none;
+}
+.left-panel { left: 14px; }
+.right-panel { right: 14px; width: 214px; }
+
+.panel-heading, .section-title, .reminder-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.panel-heading h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.left-panel .panel-heading > div { display: none; }
+.left-panel .panel-heading { justify-content: flex-start; }
+.panel-heading.compact { margin-bottom: 14px; }
+.eyebrow {
+  color: #b77a43;
+  font: 500 9px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+.panel-pulse, .memory-mark, .reminder-mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff9d3d;
+  box-shadow: 0 0 10px rgba(255, 157, 61, 0.85);
+}
+.memory-mark, .reminder-mark { width: auto; height: auto; background: none; box-shadow: none; color: #ffb76b; font-size: 16px; }
+
+.status-stack { display: grid; gap: 8px; margin-top: 12px; }
+.metric-row, .readout-row, .window-readout {
+  position: relative;
+  width: 54px;
+  min-height: 54px;
+  margin: 0;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(10, 12, 19, 0.34);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(8px);
+}
+.metric-icon {
+  display: block;
+  color: rgba(255, 189, 128, 0.72);
+  font: 500 8px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+.metric-label, .readout-row { display: flex; justify-content: space-between; gap: 8px; color: var(--ink-dim); font-size: 11px; }
+.metric-label { display: block; margin-top: 7px; }
+.metric-label span, .readout-row > span:not(.metric-icon), .window-readout > span:not(.metric-icon) { display: none; }
+.metric-label strong, .readout-row strong { display: block; margin-top: 3px; color: var(--ink); font: 500 11px var(--font-mono); }
+.meter, .progress-track { height: 3px; margin-top: 7px; overflow: hidden; background: rgba(255,255,255,0.11); border-radius: 99px; }
+.meter span, .progress-track span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #ff7138, #ffbd66); transition: width 0.4s ease; }
+.readout-row { display: block; }
+.window-readout { display: block; margin-top: 0; color: var(--muted); font-size: 10px; }
+.window-readout strong { overflow: hidden; color: var(--ink-dim); font: 500 10px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.panel-section { margin-top: 25px; }
+.action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 11px; }
+.action-grid button, .power-actions button {
+  min-height: 34px;
+  padding: 7px 5px;
+  border: 1px solid var(--panel-line);
+  border-radius: 7px;
+  background: rgba(23, 27, 40, 0.72);
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-size: 10px;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.action-grid button span { display: block; margin-bottom: 2px; color: #ff9d3d; font-size: 13px; }
+.action-grid button:hover, .power-actions button:hover { border-color: rgba(255, 157, 61, 0.7); background: rgba(255, 157, 61, 0.1); color: var(--ink); }
+.confirm-tag { padding: 3px 5px; border-radius: 3px; background: rgba(255, 107, 107, 0.16); color: #ff8d82; font: 500 8px var(--font-mono); }
+.power-actions { display: grid; gap: 8px; margin-top: 10px; }
+.power-actions button { width: 42px; height: 42px; min-height: 42px; padding: 0; border: 0; border-radius: 50%; background: rgba(10, 12, 19, 0.34); color: var(--ink-dim); font: 600 13px var(--font-mono); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
+.power-actions svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.power-actions button:last-child { color: #ff9b91; }
+.power-actions button:hover { border: 0; background: rgba(255, 157, 61, 0.16); color: var(--ink); }
+.activity-section { padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.06); }
+.control-log { display: grid; gap: 6px; max-height: 100px; overflow: auto; margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-dim); font: 10px/1.4 var(--font-mono); }
+.control-log li.ok { color: var(--cyan); }.control-log li.err { color: var(--danger); }
+.empty-hint { color: var(--muted); font-size: 11px; }
+
+.insight-card { margin-bottom: 12px; padding: 12px; border: 0; border-radius: 14px; background: transparent; box-shadow: none; backdrop-filter: none; }
+.level-badge { padding: 4px 7px; border: 1px solid rgba(255,157,61,0.35); border-radius: 4px; color: #ffb76b; font: 500 9px var(--font-mono); }
+.relationship-score { display: flex; align-items: baseline; gap: 8px; }.relationship-score strong { color: #ffd19d; font: 600 24px var(--font-display); }.relationship-score span, .subtle-copy { color: var(--muted); font-size: 10px; }
+.subtle-copy { margin: 10px 0 0; line-height: 1.4; }
+.progress-track { margin-top: 10px; }.progress-track span { width: 0; background: linear-gradient(90deg, #ff7138, #ffcf7a); }
+.memory-list { display: grid; gap: 9px; margin: 0; }.memory-list > div { display: grid; grid-template-columns: 62px 1fr; gap: 7px; font-size: 10px; }.memory-list dt { color: var(--muted); }.memory-list dd { overflow: hidden; margin: 0; color: var(--ink-dim); text-overflow: ellipsis; white-space: nowrap; }
+.reminder-card input, .custom-card input, .custom-card select { width: 100%; margin-bottom: 7px; padding: 9px 10px; border: 1px solid var(--panel-line); border-radius: 6px; outline: none; background: rgba(23, 27, 40, 0.8); color: var(--ink); font-size: 11px; }.reminder-card input:focus, .custom-card input:focus, .custom-card select:focus { border-color: rgba(255,157,61,0.65); }
+.accent-button { width: 100%; padding: 9px; border: 1px solid #ff9d3d; border-radius: 6px; background: rgba(255,157,61,0.12); color: #ffc27e; cursor: pointer; font-size: 11px; }.accent-button:hover { background: rgba(255,157,61,0.22); }
+.form-error { margin: 7px 0; color: var(--danger); font-size: 10px; }.reminder-heading { margin-top: 18px; }.text-button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 10px; }.text-button:hover { color: var(--ink); }
+.reminder-list { display: grid; gap: 8px; max-height: 120px; overflow: auto; margin: 10px 0 0; padding: 0; list-style: none; }.reminder-item { display: grid; grid-template-columns: 1fr auto; gap: 7px; padding: 8px; border-left: 2px solid #ff9d3d; background: rgba(255,157,61,0.05); }.r-text { display: block; overflow: hidden; color: var(--ink-dim); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.r-time { display: block; margin-top: 3px; color: var(--muted); font: 9px var(--font-mono); }.reminder-item button { border: 0; background: none; color: var(--muted); cursor: pointer; }.reminder-item button:hover { color: var(--danger); }
+.chat-corner { right: calc(270px + 28px); }
+
+/* =========================================================
    CORNERED CHAT — docked bottom-right over the core, Solo
    Leveling "system window" aesthetic, recolored amber/orange.
    ========================================================= */
@@ -413,7 +528,14 @@ button, input, select {
   flex-direction: column;
   gap: 12px;
   max-height: 46vh;
+  scrollbar-color: #ff9d3d rgba(255, 157, 61, 0.08);
+  scrollbar-width: thin;
 }
+
+.corner-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+.corner-scroll::-webkit-scrollbar-track { background: rgba(255, 157, 61, 0.08); }
+.corner-scroll::-webkit-scrollbar-thumb { background: #ff9d3d; border: 2px solid rgba(10, 7, 4, 0.78); border-radius: 9px; }
+.corner-scroll::-webkit-scrollbar-thumb:hover { background: #ffbd66; }
 
 .chat-empty {
   margin: auto;
@@ -558,9 +680,16 @@ button, input, select {
    ========================================================= */
 
 @media (max-width: 980px) {
+  .side-panel { display: none; }
+  .left-panel { display: block; top: auto; right: auto; bottom: 16px; left: 12px; padding: 0; }
+  .left-panel .panel-heading, .left-panel .status-stack, .left-panel .activity-section { display: none; }
+  .left-panel .power-section { margin: 0; }
+  .left-panel .section-title { display: none; }
+  .left-panel .power-actions { display: flex; gap: 8px; margin: 0; }
   .hud { top: 12px; right: 12px; gap: 8px; }
   .wake-toggle .wake-label { display: none; }
 
+  .right-panel { display: block; top: 96px; right: 12px; width: 214px; }
   .chat-corner { right: 12px; bottom: 12px; width: 300px; }
   .corner-body { max-height: min(70vh, 480px); }
   .corner-scroll { max-height: 54vh; }

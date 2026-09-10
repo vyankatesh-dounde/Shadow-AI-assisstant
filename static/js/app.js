@@ -42,6 +42,7 @@
   const ttsAudio = el("tts-audio");
 
   const quickActions = document.querySelector(".quick-actions");
+  const powerActions = document.querySelector(".power-actions");
 
   const coreCanvas = el("core-canvas");
   const chatCorner = el("chat-corner");
@@ -54,6 +55,7 @@
   const memFill = el("mem-fill");
   const activeWindowEl = el("active-window");
   const batteryVal = el("battery-val");
+  const uptimeVal = el("uptime-val");
 
   const controlLog = el("control-log");
   const reminderList = el("reminder-list");
@@ -61,6 +63,12 @@
   const reminderWhen = el("reminder-when");
   const reminderAdd = el("reminder-add");
   const reminderError = el("reminder-error");
+  const reminderClear = el("reminder-clear");
+  const memoryList = el("memory-list");
+  const relationshipLevel = el("relationship-level");
+  const relationshipPoints = el("relationship-points");
+  const relationshipProgress = el("relationship-progress");
+  const relationshipLast = el("relationship-last");
 
   const customSelect = el("custom-action-select");
   const customValue = el("custom-action-value");
@@ -97,12 +105,6 @@
 
   gateConnect.addEventListener("click", () => {
     const t = gateToken.value.trim();
-
-
-    if (!t) {
-      gateError.textContent = "Enter a token to continue.";
-      return;
-    }
 
     setToken(t);
     connect();
@@ -142,12 +144,6 @@
     const token = getToken();
 
 
-    if (!token) {
-      showGate();
-      return;
-    }
-
-
     connIndicator.dataset.state = "connecting";
     connIndicator.querySelector(".conn-label").textContent = "connecting…";
 
@@ -184,6 +180,7 @@
 
 
       refreshStatusOnce();
+      refreshInsights();
 
     };
 
@@ -230,6 +227,7 @@
         setPresence("idle");
         addBubble("assistant", data.text, data.audio_url);
         playAudio(data.audio_url);
+        refreshInsights();
         break;
       case "reminder_due":
 
@@ -256,26 +254,13 @@
 
       case "error":
         console.error("[Shadow]", data.message || "Unknown error");
+        logControl(data.message || "Unknown error", "err");
         break;
-      case "reminders_updated":
-      case "status":
-        break;
-      case "desktop_event":
-        if (data.result?.status === "ok") {
-          addBubble("system", data.result.result || "Desktop action completed.");
-        } else if (data.result?.status === "error") {
-          addBubble("system", data.result.result || "Desktop action failed.");
-        }
-
       case "status":
         renderStatus(data);
         break;
       case "desktop_event":
         handleDesktopEvent(data);
-        break;
-      case "error":
-        logControl(data.message || "Unknown error", "err");
-
         break;
       case "pong":
         break;
@@ -346,7 +331,7 @@
     if (core) core.setState(state);
   }
 
-  function playAudio(url) {
+  function playAudio(url, onDone) {
     if (!url) return;
     setPresence("speaking");
     ttsAudio.src = url;
@@ -530,10 +515,11 @@
   // MAIN PLAY AUDIO FUNCTION
   // -------------------------------------------------------
 
-  function playAudio(url) {
+  function playAudio(url, onDone) {
 
     if (!url) {
       console.debug("[Shadow][audio] No audio URL");
+      if (onDone) onDone();
       return;
     }
 
@@ -572,6 +558,7 @@
         }
 
         setPresence("idle");
+        if (onDone) onDone();
       };
 
 
@@ -592,6 +579,7 @@
         }
 
         setPresence("idle");
+        if (onDone) onDone();
       };
 
 
@@ -751,17 +739,20 @@
   });
 
 
-  const CONFIRM_ACTIONS = new Set(["restart", "sleep_pc", "stop_server", "close"]);
-  quickActions?.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-action]");
-    if (!button) return;
-    const action = button.dataset.action;
-    const value = button.dataset.value || "";
-    const confirm = CONFIRM_ACTIONS.has(action)
-      ? window.confirm(`Confirm: ${button.textContent.trim()}?`)
-      : false;
-    if (CONFIRM_ACTIONS.has(action) && !confirm) return;
-    send({ type: "action", action, value, confirm });
+  const CONFIRM_ACTIONS = new Set(["restart", "sleep_shadow", "stop_server", "close"]);
+  [quickActions, powerActions].filter(Boolean).forEach((actionGroup) => {
+    actionGroup.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      const value = button.dataset.value || "";
+      const label = button.getAttribute("aria-label") || button.title || action;
+      const confirm = CONFIRM_ACTIONS.has(action)
+        ? window.confirm(`Confirm: ${label}?`)
+        : false;
+      if (CONFIRM_ACTIONS.has(action) && !confirm) return;
+      send({ type: "action", action, value, confirm });
+    });
   });
 
 
@@ -859,7 +850,13 @@
       line = WAKE_ACK;
     }
     addBubble("system", line);
-    speakLocal(line, onDone);
+    api("/api/tts", { method: "POST", body: JSON.stringify({ text: line }) })
+      .then((result) => playAudio(result.audio_url, onDone))
+      .catch(() => {
+        // Do not use the browser's default voice: all Shadow speech should
+        // come from the same server-side Raphael voice path.
+        if (onDone) onDone();
+      });
   }
 
   function updateWakeUI() {
@@ -1220,6 +1217,16 @@
     }
     if (activeWindowEl) activeWindowEl.textContent = data.active_window || "–";
     if (batteryVal) batteryVal.textContent = data.battery != null ? `${data.battery}%` : "n/a";
+    if (uptimeVal) uptimeVal.textContent = formatUptime(data.uptime_seconds);
+  }
+
+  function formatUptime(seconds) {
+    if (!Number.isFinite(seconds)) return "--";
+    const minutes = Math.floor(seconds / 60);
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const rest = minutes % 60;
+    return days ? `${days}d ${hours}h` : `${hours}h ${rest}m`;
   }
 
   async function refreshStatusOnce() {
@@ -1227,6 +1234,53 @@
       const data = await api("/api/status");
       renderStatus(data);
     } catch (e) {}
+  }
+
+  async function refreshInsights() {
+    try {
+      const [facts, relationship] = await Promise.all([
+        api("/api/facts"),
+        api("/api/relationship"),
+      ]);
+      renderMemory(facts);
+      renderRelationship(relationship);
+    } catch (e) {
+      console.debug("[Shadow] insight refresh failed:", e.message);
+    }
+  }
+
+  function renderMemory(facts) {
+    if (!memoryList) return;
+    memoryList.innerHTML = "";
+    const entries = [
+      ["Name", facts?.user_name],
+      ["Likes", Array.isArray(facts?.like) ? facts.like.join(", ") : facts?.like],
+      ["Favorite", facts?.favorite],
+      ["Mood", facts?.mood],
+    ].filter(([, value]) => value);
+    if (!entries.length) {
+      memoryList.innerHTML = '<div class="empty-hint">No saved facts yet.</div>';
+      return;
+    }
+    entries.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.innerHTML = '<dt></dt><dd></dd>';
+      row.querySelector("dt").textContent = label;
+      row.querySelector("dd").textContent = value;
+      memoryList.appendChild(row);
+    });
+  }
+
+  function renderRelationship(data) {
+    if (!data) return;
+    const level = Number(data.level) || 1;
+    const points = Number(data.points) || 0;
+    if (relationshipLevel) relationshipLevel.textContent = `LVL ${level}`;
+    if (relationshipPoints) relationshipPoints.textContent = points;
+    if (relationshipProgress) relationshipProgress.style.width = `${Math.min(100, (points % 50) * 2)}%`;
+    if (relationshipLast && data.last_interaction) {
+      relationshipLast.textContent = `Last contact ${new Date(data.last_interaction).toLocaleString()}`;
+    }
   }
 
   // ======
@@ -1238,6 +1292,7 @@
     li.textContent = text;
     if (cls) li.className = cls;
     if (!controlLog) return;
+    controlLog.querySelector(".empty-hint")?.remove();
     controlLog.prepend(li);
     while (controlLog.children.length > 20) controlLog.removeChild(controlLog.lastChild);
   }
@@ -1251,6 +1306,10 @@
     if (result.status === "error") {
       logControl(`✕ ${data.action}: ${result.result}`, "err");
     } else {
+      if (data.action === "sleep_shadow") {
+        setPresence("idle");
+        addBubble("system", "Shadow task stopped.");
+      }
       logControl(`✓ ${result.result || data.action}`, "ok");
     }
   }
@@ -1275,6 +1334,7 @@
   const ACTION_LABELS = {
     stop_server: "stop the server",
     restart: "restart the PC",
+    sleep_shadow: "stop the current Shadow task",
     sleep_pc: "put the PC to sleep",
     close: "close that app",
   };
@@ -1309,6 +1369,7 @@
   // ======
 
   function setReminderError(msg) {
+    if (!reminderError) return;
     if (!msg) {
       reminderError.classList.add("hidden");
       reminderError.textContent = "";
@@ -1319,6 +1380,7 @@
   }
 
   function renderReminders(reminders) {
+    if (!reminderList) return;
     reminderList.innerHTML = "";
     if (!reminders.length) {
       const li = document.createElement("li");
@@ -1385,6 +1447,15 @@
     }
   });
 
+  reminderClear?.addEventListener("click", async () => {
+    if (!window.confirm("Clear all reminders?")) return;
+    try {
+      await api("/api/reminders", { method: "DELETE" });
+    } catch (e) {
+      setReminderError(e.message || "Couldn't clear reminders.");
+    }
+  });
+
   [reminderText, reminderWhen].filter(Boolean).forEach((input) => {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") reminderAdd?.click();
@@ -1430,10 +1501,6 @@
   // BOOT
   // ======
 
-  if (getToken()) {
-    connect();
-  } else {
-    showGate();
-  }
+  connect();
 
 })();

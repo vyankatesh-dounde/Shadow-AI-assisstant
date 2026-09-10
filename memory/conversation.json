@@ -1,19 +1,15 @@
 [
   {
     "role": "assistant",
-    "content": "What should I search for?"
+    "content": "I couldn't retrieve web results for 'some best mega projects'."
   },
   {
     "role": "user",
-    "content": "search for python"
+    "content": "search for some best mega projects"
   },
   {
     "role": "assistant",
-    "content": "Web results for: python\n1. PYTHON\n   https://en.wikipedia.org/wiki/PYTHON\n   PYTHON was a Cold War contingency plan of the British Government for the continuity of government in the event of nuclear war.\n2. Cold War history of the United Kingdom\n   https://duckduckgo.com/c/Cold_War_history_of_the_United_Kingdom\n   Cold War history of the United Kingdom\n3. United Kingdom nuclear command and control\n   https://duckduckgo.com/c/United_Kingdom_nuclear_command_and_control\n   United Kingdom nuclear command and control\n4. Continuity of government\n   https://duckduckgo.com/c/Continuity_of_government\n   Continuity of government\n5. Emergency management in the United Kingdom\n   https://duckduckgo.com/c/Emergency_management_in_the_United_Kingdom\n   Emergency management in the United Kingdom"
-  },
-  {
-    "role": "user",
-    "content": "connected to the LLM"
+    "content": "I couldn't retrieve web results for 'some best mega projects'."
   },
   {
     "role": "user",
@@ -25,26 +21,30 @@
   },
   {
     "role": "user",
-    "content": "open c drive"
-  },
-  {
-    "role": "assistant",
-    "content": "Opening it now."
+    "content": "hi"
   },
   {
     "role": "user",
-    "content": "he shadow"
+    "content": "hi"
   },
   {
     "role": "user",
-    "content": "are you connected to the LLM model"
+    "content": "hi"
   },
   {
     "role": "user",
-    "content": "search for Spider-Man"
+    "content": "hi"
   },
   {
-    "role": "assistant",
-    "content": "Web results for: Spider-Man\n1. Spider-Man\n   https://en.wikipedia.org/wiki/Spider-Man\n   Spider-Man is a superhero in American comic books published by Marvel Comics. Created by writer-editor Stan Lee and artist Steve Ditko, he first appeared in the anthology comic book Amazing Fantasy #15 in the Silver Age of Comic Books. Widely regarded as one of the most popular and commercially successful superheroes, he has been featured in comic books, television shows, films, video games, novels, and plays. Spider-Man's secret identity is Peter Benjamin Parker, who was raised by his Aunt May and Uncle Ben in Queens, New York City, after the death of his parents. Lee, Ditko, and later writers had the character deal with the struggles of adolescence and young adulthood. Readers identified with his self-doubt and loneliness. Unlike previous teen heroes, Spider-Man would be given many supporting characters.\n2. Spider-Man Category\n   https://duckduckgo.com/c/Spider-Man\n   Spider-Man Category\n3. Spiders in popular culture\n   https://duckduckgo.com/c/Spiders_in_popular_culture\n   Spiders in popular culture\n4. Comics by Stan Lee\n   https://duckduckgo.com/c/Comics_by_Stan_Lee\n   Comics by Stan Lee\n5. Comics by Steve Ditko\n   https://duckduckgo.com/c/Comics_by_Steve_Ditko\n   Comics by Steve Ditko"
+    "role": "user",
+    "content": "link cpu with the black with transparent background"
+  },
+  {
+    "role": "user",
+    "content": "are you connected to the llm"
+  },
+  {
+    "role": "user",
+    "content": "restart shadow i need stop shadow"
   }
 ]

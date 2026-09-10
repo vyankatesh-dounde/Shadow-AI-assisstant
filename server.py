@@ -147,6 +147,16 @@ class ConnectionManager:
             self.disconnect(ws)
 
 manager = ConnectionManager()
+active_chat_tasks: set[asyncio.Task] = set()
+
+
+def cancel_active_chat_tasks() -> int:
+    cancelled = 0
+    for task in tuple(active_chat_tasks):
+        if not task.done():
+            task.cancel()
+            cancelled += 1
+    return cancelled
 
 # =
 # ⚙️ DESKTOP ACTION MAP
@@ -189,6 +199,10 @@ async def run_action(action: str, value, confirm: bool):
         result = await stop_server()
         return {"status": "ok", "result": result}
 
+    if action == "sleep_shadow":
+        cancelled = cancel_active_chat_tasks()
+        return {"status": "ok", "result": f"Stopped {cancelled} active Shadow task(s)."}
+
     if action in HEAVY_ACTIONS:
         if action == "open_smart":
             result = await asyncio.to_thread(open_smart, value or "")
@@ -209,7 +223,10 @@ async def run_action(action: str, value, confirm: bool):
 
 @app.get("/")
 async def index():
-    return FileResponse(str(BASE_DIR / "static" / "index.html"))
+    return FileResponse(
+        str(BASE_DIR / "static" / "index.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 # =
 # 💬 REST: CONVERSATION / FACTS
@@ -345,6 +362,28 @@ async def api_tts(request: Request):
 # 🔌 WEBSOCKET: REAL-TIME CHAT + LIVE EVENTS
 # =
 
+async def handle_chat_message(text: str):
+    await manager.broadcast({"type": "user_message", "text": text})
+
+    async with chat_lock:
+        reply = await process(text, personality)
+
+    audio_url = None
+    try:
+        audio_url = await synthesize(reply)
+    except Exception as e:
+        print("TTS error:", e)
+
+    await manager.broadcast({
+        "type": "response",
+        "text": reply,
+        "audio_url": audio_url,
+    })
+    await manager.broadcast({
+        "type": "reminders_updated",
+        "reminders": list_reminders(),
+    })
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default=None)):
     if not check_token(token):
@@ -371,34 +410,9 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
                     await ws.send_json({"type": "error", "message": "Message is too long."})
                     continue
 
-                # Let every connected device see the user's message immediately
-                await manager.broadcast({"type": "user_message", "text": text})
-
-                # Conversation/memory JSON files are read-modify-written.
-                # Serializing turns prevents concurrent clients from losing
-                # each other's messages or reminder updates.
-                async with chat_lock:
-                    reply = await process(text, personality)
-
-                audio_url = None
-                try:
-                    audio_url = await synthesize(reply)
-                except Exception as e:
-                    print("TTS error:", e)
-
-                await manager.broadcast({
-                    "type": "response",
-                    "text": reply,
-                    "audio_url": audio_url,
-                })
-
-                # brain.py may have just created a reminder from a
-                # natural-language request ("remind me to..."); push
-                # the current list so it shows up without a refresh.
-                await manager.broadcast({
-                    "type": "reminders_updated",
-                    "reminders": list_reminders(),
-                })
+                task = asyncio.create_task(handle_chat_message(text))
+                active_chat_tasks.add(task)
+                task.add_done_callback(active_chat_tasks.discard)
 
             elif msg_type == "action":
                 action = data.get("action")
