@@ -1,17 +1,5 @@
 [
   {
-    "role": "assistant",
-    "content": "I couldn't retrieve web results for 'some best mega projects'."
-  },
-  {
-    "role": "user",
-    "content": "search for some best mega projects"
-  },
-  {
-    "role": "assistant",
-    "content": "I couldn't retrieve web results for 'some best mega projects'."
-  },
-  {
     "role": "user",
     "content": "search for Spider-Man"
   },
@@ -21,30 +9,42 @@
   },
   {
     "role": "user",
-    "content": "hi"
+    "content": "are you connected"
   },
   {
     "role": "user",
-    "content": "hi"
+    "content": "open C drive"
+  },
+  {
+    "role": "assistant",
+    "content": "Opening it now."
   },
   {
     "role": "user",
-    "content": "hi"
+    "content": "open games folder"
+  },
+  {
+    "role": "assistant",
+    "content": "Opening games"
   },
   {
     "role": "user",
-    "content": "hi"
+    "content": "Watch Dogs"
   },
   {
     "role": "user",
-    "content": "link cpu with the black with transparent background"
+    "content": "open Watch Dogs"
+  },
+  {
+    "role": "assistant",
+    "content": "Opening watch dogs"
   },
   {
     "role": "user",
-    "content": "are you connected to the llm"
+    "content": "search for python"
   },
   {
-    "role": "user",
-    "content": "restart shadow i need stop shadow"
+    "role": "assistant",
+    "content": "Web results for: python\n1. PYTHON\n   https://en.wikipedia.org/wiki/PYTHON\n   PYTHON was a Cold War contingency plan of the British Government for the continuity of government in the event of nuclear war.\n2. Cold War history of the United Kingdom\n   https://duckduckgo.com/c/Cold_War_history_of_the_United_Kingdom\n   Cold War history of the United Kingdom\n3. United Kingdom nuclear command and control\n   https://duckduckgo.com/c/United_Kingdom_nuclear_command_and_control\n   United Kingdom nuclear command and control\n4. Continuity of government\n   https://duckduckgo.com/c/Continuity_of_government\n   Continuity of government\n5. Emergency management in the United Kingdom\n   https://duckduckgo.com/c/Emergency_management_in_the_United_Kingdom\n   Emergency management in the United Kingdom"
   }
 ]

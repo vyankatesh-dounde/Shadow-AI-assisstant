@@ -12,7 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import (
     ASSISTANT_NAME, HOST, PORT, ENABLE_AUTH, API_TOKEN, ALLOWED_ORIGINS,
-    CONFIRM_REQUIRED_ACTIONS, REMINDER_POLL_INTERVAL, STATUS_BROADCAST_INTERVAL,
 )
 from core.personality import Personality
 from core.brain import process
@@ -20,7 +19,6 @@ from core.memory import load_conversation, load_facts, clear_conversation
 from core.relationship import load_relationship
 from core.reminders import (
     add_reminder, list_reminders, delete_reminder, clear_reminders,
-    add_reminder, get_due_reminders, list_reminders, delete_reminder, clear_reminders,
 )
 from core.time_parser import parse_time
 from core.system_status import get_status
@@ -32,31 +30,16 @@ from integrations.connection_manager import ConnectionManager
 BASE_DIR = Path(__file__).resolve().parent
 MAX_MESSAGE_CHARS = 4_000
 
-from core.file_indexer import build_index, open_indexed
-from core.server_control import stop_server
-
-from core.desktop_control import (
-    open_app, open_smart, open_website, search_google, open_path,
-    close_window, close_app, switch_window, switch_window_back,
-    show_all_windows, minimize_all, volume_up, volume_down,
-    restart, sleep_pc, cancel_shutdown, type_text, play_pause,
-)
-
-BASE_DIR = Path(__file__).resolve().parent
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ---- startup ----
 
-    if ENABLE_AUTH and API_TOKEN == "change-this-to-a-long-random-secret":
+    if ENABLE_AUTH and API_TOKEN == "change-me-shadow-2026":
         raise RuntimeError(
             "Set a unique API_TOKEN in config.py before exposing Shadow on a network."
         )
     reminder_task = asyncio.create_task(watch_reminders(manager))
     status_task = asyncio.create_task(broadcast_status(manager))
-
-    reminder_task = asyncio.create_task(reminder_watcher())
-    status_task = asyncio.create_task(status_broadcaster())
 
     print(f"{ASSISTANT_NAME} web server ready.")
     if ENABLE_AUTH:
@@ -113,38 +96,10 @@ def check_token(token: Optional[str]) -> bool:
  
     return bool(token) and hmac.compare_digest(token, API_TOKEN)
 
-    return token == API_TOKEN
-
 def require_token(request: Request):
     token = request.headers.get("X-API-Token") or request.query_params.get("token")
     if not check_token(token):
         raise HTTPException(status_code=401, detail="Invalid or missing API token")
-
-# =
-# 🔌 CONNECTION MANAGER (broadcasts to every connected device)
-# =
-
-class ConnectionManager:
-    def __init__(self):
-        self.active: list[WebSocket] = []
-
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.active.append(ws)
-
-    def disconnect(self, ws: WebSocket):
-        if ws in self.active:
-            self.active.remove(ws)
-
-    async def broadcast(self, message: dict):
-        dead = []
-        for ws in self.active:
-            try:
-                await ws.send_json(message)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(ws)
 
 manager = ConnectionManager()
 active_chat_tasks: set[asyncio.Task] = set()
@@ -157,65 +112,6 @@ def cancel_active_chat_tasks() -> int:
             task.cancel()
             cancelled += 1
     return cancelled
-
-# =
-# ⚙️ DESKTOP ACTION MAP
-# =
-
-def _run_action(action: str, value):
-    """Fast, non-blocking, synchronous actions. Heavy ones (file
-    search/indexing) and the server-lifecycle one (stop_server) are
-    dispatched separately in run_action()."""
-    table = {
-        "open": lambda: open_app(value or ""),
-        "open_website": lambda: open_website(value or ""),
-        "search": lambda: search_google(value or ""),
-        "close": lambda: close_app(value or ""),
-        "close_window": lambda: close_window(),
-        "switch_window": lambda: switch_window(),
-        "switch_window_back": lambda: switch_window_back(),
-        "show_all_windows": lambda: show_all_windows(),
-        "minimize_all": lambda: minimize_all(),
-        "volume_up": lambda: volume_up(),
-        "volume_down": lambda: volume_down(),
-        "type_text": lambda: type_text(value or ""),
-        "play_pause": lambda: play_pause(),
-        "restart": lambda: restart(),
-        "sleep_pc": lambda: sleep_pc(),
-        "cancel_shutdown": lambda: cancel_shutdown(),
-    }
-    fn = table.get(action)
-    if not fn:
-        return None
-    return fn()
-
-HEAVY_ACTIONS = {"open_smart", "open_indexed", "index_files"}
-
-async def run_action(action: str, value, confirm: bool):
-    if action in CONFIRM_REQUIRED_ACTIONS and not confirm:
-        return {"status": "confirm_required", "action": action, "value": value}
-
-    if action == "stop_server":
-        result = await stop_server()
-        return {"status": "ok", "result": result}
-
-    if action == "sleep_shadow":
-        cancelled = cancel_active_chat_tasks()
-        return {"status": "ok", "result": f"Stopped {cancelled} active Shadow task(s)."}
-
-    if action in HEAVY_ACTIONS:
-        if action == "open_smart":
-            result = await asyncio.to_thread(open_smart, value or "")
-        elif action == "open_indexed":
-            result = await asyncio.to_thread(open_indexed, value or "")
-        else:  # index_files
-            result = await asyncio.to_thread(build_index)
-        return {"status": "ok", "result": result}
-
-    result = _run_action(action, value)
-    if result is None:
-        return {"status": "error", "result": f"Unknown action '{action}'"}
-    return {"status": "ok", "result": result}
 
 # =
 # 🏠 STATIC PAGES
@@ -335,7 +231,7 @@ async def api_desktop_action(request: Request):
     if not action:
         raise HTTPException(status_code=400, detail="Missing 'action'")
 
-    result = await run_action(action, value, confirm)
+    result = await run_action(action, value, confirm, cancel_active_chat_tasks)
     await manager.broadcast({"type": "desktop_event", "action": action, "value": value, "result": result})
     return result
 
@@ -423,7 +319,7 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
                     await ws.send_json({"type": "error", "message": "Missing 'action'"})
                     continue
 
-                result = await run_action(action, value, confirm)
+                result = await run_action(action, value, confirm, cancel_active_chat_tasks)
                 await manager.broadcast({
                     "type": "desktop_event",
                     "action": action,
@@ -442,45 +338,6 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
     except Exception as e:
         print("WebSocket error:", e)
         manager.disconnect(ws)
-
-# =
-# 🔁 BACKGROUND TASKS
-# =
-
-async def reminder_watcher():
-    while True:
-        try:
-            due = get_due_reminders()
-            for text in due:
-                audio_url = None
-                try:
-                    audio_url = await synthesize(f"Reminder: {text}")
-                except Exception as e:
-                    print("TTS error:", e)
-
-                await manager.broadcast({
-                    "type": "reminder_due",
-                    "text": text,
-                    "audio_url": audio_url,
-                })
-
-            if due:
-                await manager.broadcast({"type": "reminders_updated", "reminders": list_reminders()})
-
-        except Exception as e:
-            print("Reminder watcher error:", e)
-
-        await asyncio.sleep(REMINDER_POLL_INTERVAL)
-
-async def status_broadcaster():
-    while True:
-        try:
-            if manager.active:
-                await manager.broadcast({"type": "status", **get_status()})
-        except Exception as e:
-            print("Status broadcaster error:", e)
-
-        await asyncio.sleep(STATUS_BROADCAST_INTERVAL)
 
 if __name__ == "__main__":
     import uvicorn

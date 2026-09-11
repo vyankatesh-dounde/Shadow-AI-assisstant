@@ -28,12 +28,17 @@ def _run_desktop_action(action: str, value):
     return handler() if handler else None
 
 
-async def run_action(action: str, value, confirm: bool) -> dict:
+async def run_action(action: str, value, confirm: bool, on_sleep_shadow=None) -> dict:
     """Validate and run an action without HTTP, WebSocket, or UI concerns."""
     if action in CONFIRM_REQUIRED_ACTIONS and not confirm:
         return {"status": "confirm_required", "action": action, "value": value}
     if action == "stop_server":
         return {"status": "ok", "result": await stop_server()}
+    if action == "sleep_shadow":
+        if on_sleep_shadow is None:
+            return {"status": "error", "result": "Shadow task cancellation is unavailable"}
+        cancelled = on_sleep_shadow()
+        return {"status": "ok", "result": f"Stopped {cancelled} active Shadow task(s)."}
     if action == "open_smart":
         result = await asyncio.to_thread(open_smart, value or "")
     elif action == "open_indexed":

@@ -1,7 +1,5 @@
 import os
 import json
-import threading
-import time
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -91,20 +89,3 @@ def open_indexed(query: str):
         return f"Opening {query}"
     else:
         return f"I couldn't find {query}"
-
-
-# =========================
-# 🔁 AUTO INDEX (BACKGROUND)
-# =========================
-def auto_index(interval=3600):
-    def run():
-        while True:
-            try:
-                build_index()
-            except Exception as e:
-                print("Indexing error:", e)
-
-            time.sleep(interval)
-
-    thread = threading.Thread(target=run, daemon=True)
-    thread.start()

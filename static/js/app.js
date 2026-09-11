@@ -30,8 +30,6 @@
 
 
 
-  const presence = el("presence");
-
   const connIndicator = el("conn-indicator");
   const wakeToggle = el("wake-toggle");
   const chatScroll = el("chat-scroll");
@@ -41,7 +39,6 @@
   const micBtn = el("mic-btn");
   const ttsAudio = el("tts-audio");
 
-  const quickActions = document.querySelector(".quick-actions");
   const powerActions = document.querySelector(".power-actions");
 
   const coreCanvas = el("core-canvas");
@@ -58,22 +55,10 @@
   const uptimeVal = el("uptime-val");
 
   const controlLog = el("control-log");
-  const reminderList = el("reminder-list");
-  const reminderText = el("reminder-text");
-  const reminderWhen = el("reminder-when");
-  const reminderAdd = el("reminder-add");
-  const reminderError = el("reminder-error");
-  const reminderClear = el("reminder-clear");
-  const memoryList = el("memory-list");
   const relationshipLevel = el("relationship-level");
   const relationshipPoints = el("relationship-points");
   const relationshipProgress = el("relationship-progress");
   const relationshipLast = el("relationship-last");
-
-  const customSelect = el("custom-action-select");
-  const customValue = el("custom-action-value");
-  const customRun = el("custom-action-run");
-
 
   let ws = null;
   let reconnectDelay = 1000;
@@ -243,7 +228,6 @@
 
 
       case "reminders_updated":
-        renderReminders(data.reminders || []);
         break;
 
       case "conversation_cleared":
@@ -329,14 +313,6 @@
   function setPresence(state) {
     presenceState = state;
     if (core) core.setState(state);
-  }
-
-  function playAudio(url, onDone) {
-    if (!url) return;
-    setPresence("speaking");
-    ttsAudio.src = url;
-    ttsAudio.play().catch(() => {});
-    ttsAudio.onended = () => setPresence("idle");
   }
 
   // PRESENCE + TTS AUDIO
@@ -740,7 +716,7 @@
 
 
   const CONFIRM_ACTIONS = new Set(["restart", "sleep_shadow", "stop_server", "close"]);
-  [quickActions, powerActions].filter(Boolean).forEach((actionGroup) => {
+  [powerActions].filter(Boolean).forEach((actionGroup) => {
     actionGroup.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-action]");
       if (!button) return;
@@ -965,8 +941,6 @@
       // commonly inserts before it emits a final transcript. The active
       // result handler still submits one final command and switches back
       // to wake/off mode, while an explicit mic click still stops it.
-      recognizer.continuous = mode === "wake" || mode === "active";
-
       recognizer.continuous = mode === "wake";
 
       recognizer.interimResults = mode === "wake";
@@ -1027,18 +1001,6 @@
         finishingSession = false;
         applyMode(next);
       }, 100);
-    }
-
-    recognizer.onstart = () => {
-      finishingSession = false;
-
-      recognizerRunning = false;
-      micBtn.classList.remove("recording");
-      if (voiceMode === "active" && presenceState === "listening") setPresence("idle");
-
-      const next = pendingMode !== null ? pendingMode : (wakeEnabled ? "wake" : "off");
-      pendingMode = null;
-      applyMode(next);
     }
 
     recognizer.onstart = () => {
@@ -1238,37 +1200,11 @@
 
   async function refreshInsights() {
     try {
-      const [facts, relationship] = await Promise.all([
-        api("/api/facts"),
-        api("/api/relationship"),
-      ]);
-      renderMemory(facts);
+      const relationship = await api("/api/relationship");
       renderRelationship(relationship);
     } catch (e) {
       console.debug("[Shadow] insight refresh failed:", e.message);
     }
-  }
-
-  function renderMemory(facts) {
-    if (!memoryList) return;
-    memoryList.innerHTML = "";
-    const entries = [
-      ["Name", facts?.user_name],
-      ["Likes", Array.isArray(facts?.like) ? facts.like.join(", ") : facts?.like],
-      ["Favorite", facts?.favorite],
-      ["Mood", facts?.mood],
-    ].filter(([, value]) => value);
-    if (!entries.length) {
-      memoryList.innerHTML = '<div class="empty-hint">No saved facts yet.</div>';
-      return;
-    }
-    entries.forEach(([label, value]) => {
-      const row = document.createElement("div");
-      row.innerHTML = '<dt></dt><dd></dd>';
-      row.querySelector("dt").textContent = label;
-      row.querySelector("dd").textContent = value;
-      memoryList.appendChild(row);
-    });
   }
 
   function renderRelationship(data) {
@@ -1318,18 +1254,6 @@
     send({ type: "action", action, value, confirm });
   }
 
-  document.querySelectorAll(".action-grid button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      runAction(btn.dataset.action, btn.dataset.value || null, false);
-    });
-  });
-
-  customRun?.addEventListener("click", () => {
-    const action = customSelect.value;
-    const value = customValue.value.trim();
-    runAction(action, value || null, false);
-  });
-
   // ---- confirm modal for dangerous / lifecycle actions ----
   const ACTION_LABELS = {
     stop_server: "stop the server",
@@ -1365,105 +1289,6 @@
   }
 
   // ======
-  // REMINDERS
-  // ======
-
-  function setReminderError(msg) {
-    if (!reminderError) return;
-    if (!msg) {
-      reminderError.classList.add("hidden");
-      reminderError.textContent = "";
-      return;
-    }
-    reminderError.textContent = msg;
-    reminderError.classList.remove("hidden");
-  }
-
-  function renderReminders(reminders) {
-    if (!reminderList) return;
-    reminderList.innerHTML = "";
-    if (!reminders.length) {
-      const li = document.createElement("li");
-      li.className = "empty-hint";
-      li.textContent = "No reminders yet.";
-      reminderList.appendChild(li);
-      return;
-    }
-    reminders.forEach((r) => {
-      const li = document.createElement("li");
-      li.className = "reminder-item";
-      const when = new Date(r.time * 1000);
-      li.innerHTML = `
-        <div>
-          <span class="r-text"></span>
-          <span class="r-time"></span>
-        </div>
-        <button title="Delete">✕</button>
-      `;
-      li.querySelector(".r-text").textContent = r.text;
-      li.querySelector(".r-time").textContent = when.toLocaleString();
-      li.querySelector("button").addEventListener("click", async () => {
-        try {
-          await api(`/api/reminders/${encodeURIComponent(r.id)}`, { method: "DELETE" });
-        } catch (e) {
-          logControl(`Couldn't delete reminder: ${e.message}`, "err");
-        }
-      });
-      reminderList.appendChild(li);
-    });
-  }
-
-  reminderAdd?.addEventListener("click", async () => {
-    const text = reminderText.value.trim();
-    const when = reminderWhen.value.trim();
-
-    setReminderError(null);
-    if (!text) {
-      setReminderError("Enter what to remind you about.");
-      return;
-    }
-    if (!when) {
-      setReminderError("Enter when — e.g. 'in 10 minutes' or 'at 6pm'.");
-      return;
-    }
-
-    reminderAdd.disabled = true;
-    try {
-      await api("/api/reminders", { method: "POST", body: JSON.stringify({ text, when }) });
-      reminderText.value = "";
-      reminderWhen.value = "";
-      // reminders_updated will arrive over the WebSocket and re-render
-      // the list; if the socket happens to be down, fall back to a
-      // direct fetch so the new reminder still shows up.
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        try {
-          renderReminders(await api("/api/reminders"));
-        } catch (e) {}
-      }
-    } catch (e) {
-      setReminderError(e.message || "Couldn't add that reminder.");
-    } finally {
-      reminderAdd.disabled = false;
-    }
-  });
-
-  reminderClear?.addEventListener("click", async () => {
-    if (!window.confirm("Clear all reminders?")) return;
-    try {
-      await api("/api/reminders", { method: "DELETE" });
-    } catch (e) {
-      setReminderError(e.message || "Couldn't clear reminders.");
-    }
-  });
-
-  [reminderText, reminderWhen].filter(Boolean).forEach((input) => {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") reminderAdd?.click();
-    });
-    input.addEventListener("input", () => setReminderError(null));
-  });
-
-  // ======
 
   // NOTIFICATIONS
   // ======
@@ -1476,25 +1301,6 @@
       Notification.requestPermission();
     }
   }
-
-  // ======
-
-  // MOBILE TAB SWITCHING
-  // ======
-
-  const tabBtns = document.querySelectorAll(".tab-btn");
-  const panels = document.querySelectorAll(".panel");
-
-  function setActivePanel(name) {
-    panels.forEach((p) => p.dataset.active = String(p.dataset.panelName === name));
-    tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.panel === name));
-  }
-
-  tabBtns.forEach((btn) => {
-    btn.addEventListener("click", () => setActivePanel(btn.dataset.panel));
-  });
-
-  setActivePanel("chat");
 
   // ======
 

@@ -175,8 +175,7 @@ Shadow-AI/
 │   ├── js/
 │   │   ├── app.js            # Client logic and messaging
 │   │   └── hologram.js      # 3D hologram rendering
-│   └── audio/                # Generated voice clips
-└── f.cpp                     # Additional local project artifact
+│   └── audio/                # Generated voice clips (kept out of version control)
 ```
 
 ## Setup and Run
