@@ -42,6 +42,7 @@
   const powerActions = document.querySelector(".power-actions");
 
   const coreCanvas = el("core-canvas");
+  const agentStateEl = el("agent-state");
   const chatCorner = el("chat-corner");
   const cornerToggle = el("corner-toggle");
 
@@ -214,6 +215,13 @@
         playAudio(data.audio_url);
         refreshInsights();
         break;
+      case "agent_state":
+        setPresence(String(data.state || "IDLE").toLowerCase());
+        break;
+      case "cancelled":
+        stopAudioPlayback();
+        setPresence("idle");
+        break;
       case "reminder_due":
 
         // Reminders can still be created by chat ("remind me to…"),
@@ -311,7 +319,11 @@
   initHologram();
 
   function setPresence(state) {
-    presenceState = state;
+    presenceState = state || "idle";
+    if (agentStateEl) {
+      agentStateEl.textContent = presenceState.replaceAll("_", " ");
+      agentStateEl.dataset.state = presenceState;
+    }
     if (core) core.setState(state);
   }
 
@@ -641,6 +653,22 @@
 
   }
 
+  function stopAudioPlayback() {
+    pendingAudioUrl = null;
+    if (audioRetryTimer) {
+      clearTimeout(audioRetryTimer);
+      audioRetryTimer = null;
+    }
+    if (ttsAudio) {
+      ttsAudio.onended = null;
+      ttsAudio.onerror = null;
+      ttsAudio.pause();
+      ttsAudio.removeAttribute("src");
+      ttsAudio.load();
+    }
+    setPresence("idle");
+  }
+
   // ======
   // CHAT
   // ======
@@ -704,6 +732,7 @@
   function sendChat(text) {
     const trimmed = (text || "").trim();
     if (!trimmed) return;
+    stopAudioPlayback();
     setPresence("thinking");
     send({ type: "chat", text: trimmed });
   }
@@ -1134,6 +1163,10 @@
     };
 
     micBtn.addEventListener("click", () => {
+      if (["speaking", "thinking", "searching", "executing", "waiting_confirmation"].includes(presenceState)) {
+        stopAudioPlayback();
+        send({ type: "cancel" });
+      }
       if (voiceMode === "active") {
 
         requestMode(wakeEnabled ? "wake" : "off");

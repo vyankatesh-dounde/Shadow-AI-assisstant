@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -8,6 +9,7 @@ MEMORY_DIR.mkdir(exist_ok=True)
 
 CONVO_FILE = MEMORY_DIR / "conversation.json"
 FACTS_FILE = MEMORY_DIR / "facts.json"
+PREFERENCES_FILE = MEMORY_DIR / "preferences.json"
 
 # Keep the existing conversation contract so the rest of Shadow remains compatible.
 MAX_TURNS = 6
@@ -241,6 +243,35 @@ def _write_facts(facts: dict) -> None:
     )
 
 
+def load_preferences() -> dict:
+    if not PREFERENCES_FILE.exists():
+        return {}
+    try:
+        value = json.loads(PREFERENCES_FILE.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_preferences(preferences: dict) -> None:
+    PREFERENCES_FILE.write_text(
+        json.dumps(preferences, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def _record_preference(key: str, value: str, source: str, active: bool) -> None:
+    preferences = load_preferences()
+    history = preferences.setdefault(key, [])
+    history.append({
+        "value": value,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "active": active,
+    })
+    _write_preferences(preferences)
+
+
 def save_fact(key: str, value: Any) -> None:
     value = _clean_text(value)
     if not value:
@@ -251,7 +282,7 @@ def save_fact(key: str, value: Any) -> None:
     _write_facts(facts)
 
 
-def save_fact_list(key: str, value: Any) -> Optional[str]:
+def save_fact_list(key: str, value: Any, source: str = "explicit") -> Optional[str]:
     """Add a current preference and resolve conflicts automatically.
 
     Returns the clean value that was stored, or None if nothing was stored.
@@ -283,6 +314,7 @@ def save_fact_list(key: str, value: Any) -> Optional[str]:
         facts.pop(opposite, None)
 
     _write_facts(facts)
+    _record_preference(key, value, source, True)
     return value
 
 
@@ -306,6 +338,8 @@ def remove_fact_list(key: str, value: Any) -> Optional[str]:
         facts.pop(key, None)
 
     _write_facts(facts)
+    if removed:
+        _record_preference(key, removed[0], "explicit removal", False)
     return removed[0] if removed else None
 
 

@@ -47,3 +47,8 @@ CONFIRM_REQUIRED_ACTIONS = {"stop_server", "restart", "sleep_shadow", "sleep_pc"
 REMINDER_POLL_INTERVAL = 2
 # How often (seconds) the server broadcasts system status (CPU/RAM/active window).
 STATUS_BROADCAST_INTERVAL = 3
+
+# Per-WebSocket chat protection. These limits are intentionally modest for a
+# local assistant and prevent an accidental or hostile message flood.
+CHAT_RATE_LIMIT_WINDOW_SECONDS = 10
+CHAT_RATE_LIMIT_MAX_MESSAGES = 12

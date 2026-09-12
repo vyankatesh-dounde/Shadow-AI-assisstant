@@ -1,6 +1,8 @@
 import asyncio 
 import hmac
 import sys
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -12,9 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import (
     ASSISTANT_NAME, HOST, PORT, ENABLE_AUTH, API_TOKEN, ALLOWED_ORIGINS,
+    CHAT_RATE_LIMIT_MAX_MESSAGES, CHAT_RATE_LIMIT_WINDOW_SECONDS,
 )
 from core.personality import Personality
-from core.brain import process
+from core.brain import agent, process
+from agent.schemas import AgentState
 from core.memory import load_conversation, load_facts, clear_conversation
 from core.relationship import load_relationship
 from core.reminders import (
@@ -38,6 +42,8 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(
             "Set a unique API_TOKEN in config.py before exposing Shadow on a network."
         )
+    if HOST not in {"127.0.0.1", "localhost", "::1"} and not ENABLE_AUTH:
+        raise RuntimeError("ENABLE_AUTH must be True when HOST is not local-only.")
     reminder_task = asyncio.create_task(watch_reminders(manager))
     status_task = asyncio.create_task(broadcast_status(manager))
 
@@ -61,12 +67,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=f"{ASSISTANT_NAME} Web", lifespan=lifespan)
 
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), payment=()"
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-API-Token"],
 )
 
 class NoCacheStaticFiles(StaticFiles):
@@ -96,6 +112,20 @@ def check_token(token: Optional[str]) -> bool:
  
     return bool(token) and hmac.compare_digest(token, API_TOKEN)
 
+
+def origin_allowed(origin: Optional[str]) -> bool:
+    return not origin or "*" in ALLOWED_ORIGINS or origin in ALLOWED_ORIGINS
+
+
+def chat_rate_limited(message_times, now: Optional[float] = None) -> bool:
+    now = time.monotonic() if now is None else now
+    while message_times and now - message_times[0] > CHAT_RATE_LIMIT_WINDOW_SECONDS:
+        message_times.popleft()
+    if len(message_times) >= CHAT_RATE_LIMIT_MAX_MESSAGES:
+        return True
+    message_times.append(now)
+    return False
+
 def require_token(request: Request):
     token = request.headers.get("X-API-Token") or request.query_params.get("token")
     if not check_token(token):
@@ -112,6 +142,13 @@ def cancel_active_chat_tasks() -> int:
             task.cancel()
             cancelled += 1
     return cancelled
+
+
+async def broadcast_agent_state():
+    await manager.broadcast({
+        "type": "agent_state",
+        "state": agent.conversation.state.state.value,
+    })
 
 # =
 # 🏠 STATIC PAGES
@@ -260,9 +297,16 @@ async def api_tts(request: Request):
 
 async def handle_chat_message(text: str):
     await manager.broadcast({"type": "user_message", "text": text})
+    agent.conversation.update(state=AgentState.THINKING)
+    await broadcast_agent_state()
 
-    async with chat_lock:
-        reply = await process(text, personality)
+    try:
+        async with chat_lock:
+            reply = await process(text, personality)
+    except asyncio.CancelledError:
+        agent.conversation.update(state=AgentState.IDLE)
+        await broadcast_agent_state()
+        raise
 
     audio_url = None
     try:
@@ -275,6 +319,7 @@ async def handle_chat_message(text: str):
         "text": reply,
         "audio_url": audio_url,
     })
+    await broadcast_agent_state()
     await manager.broadcast({
         "type": "reminders_updated",
         "reminders": list_reminders(),
@@ -282,17 +327,25 @@ async def handle_chat_message(text: str):
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default=None)):
+    if not origin_allowed(ws.headers.get("origin")):
+        await ws.close(code=4403)
+        return
     if not check_token(token):
         await ws.close(code=4401)
         return
 
     await manager.connect(ws)
+    message_times = deque()
 
     try:
         # Greet this device with current state on connect
         await ws.send_json({"type": "conversation", "history": load_conversation()})
         await ws.send_json({"type": "reminders_updated", "reminders": list_reminders()})
         await ws.send_json({"type": "status", **get_status()})
+        await ws.send_json({
+            "type": "agent_state",
+            "state": agent.conversation.state.state.value,
+        })
 
         while True:
             data = await ws.receive_json()
@@ -306,9 +359,23 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
                     await ws.send_json({"type": "error", "message": "Message is too long."})
                     continue
 
+                if chat_rate_limited(message_times):
+                    await ws.send_json({"type": "error", "message": "Too many messages. Please wait a moment."})
+                    continue
+
+                cancel_active_chat_tasks()
                 task = asyncio.create_task(handle_chat_message(text))
                 active_chat_tasks.add(task)
                 task.add_done_callback(active_chat_tasks.discard)
+
+            elif msg_type == "cancel":
+                cancelled = cancel_active_chat_tasks()
+                agent.conversation.reset()
+                await broadcast_agent_state()
+                await ws.send_json({
+                    "type": "cancelled",
+                    "cancelled_tasks": cancelled,
+                })
 
             elif msg_type == "action":
                 action = data.get("action")

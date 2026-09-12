@@ -1,6 +1,8 @@
 import asyncio
+import json
 import re
 
+from agent.agent import Agent
 from ai.llm import ask_ai, FALLBACK_REPLIES
 from core.file_indexer import open_indexed, build_index
 from core.relationship import update_relationship, load_relationship
@@ -15,6 +17,7 @@ from core.reminder_nlp import try_create_reminder
 from core.wake_word import is_wake_word, handle_wake_word
 from core.memory import add_message, load_facts, load_conversation, save_fact, save_fact_list
 from core.memory_extractor import ai_extract_memory
+from core.maps_search import search_places_and_format
 from core.web_search import search_and_format
 from integrations.memory_integration import (
     learn_from_text,
@@ -67,6 +70,26 @@ def _cmd_web_search(text, lower, facts):
     if not query:
         return None
     return search_and_format(query)
+
+
+def _cmd_place_search(text, lower, facts):
+    place_terms = ("restaurant", "restaurants", "movie theater", "movie theaters", "cinema", "cinemas")
+    search_words = ("find", "search", "look for", "where is", "near me", "nearby")
+    if not any(term in lower for term in place_terms):
+        return None
+    if not any(word in lower for word in search_words):
+        return None
+    if any(word in lower for word in ("book", "reserve", "order")):
+        return None
+
+    query = text.strip()
+    for prefix in ("find ", "search for ", "search ", "look for ", "where is "):
+        if lower.startswith(prefix):
+            query = text[len(prefix):].strip()
+            break
+    if "movie" in lower or "cinema" in lower:
+        query = query.replace("movie", "movie theater")
+    return search_places_and_format(query)
 
 def _cmd_drive(text, lower, facts):
     return open_drive(lower)
@@ -193,6 +216,7 @@ def _cmd_power(text, lower, facts):
 
 COMMANDS = [
     _cmd_reminder,
+    _cmd_place_search,
     _cmd_web_search,
     _cmd_skill,
     _cmd_index_files,
@@ -204,6 +228,8 @@ COMMANDS = [
     _cmd_volume,
     _cmd_power,
 ]
+
+agent = Agent()
 
 
 def _store_ai_extracted_memory(memory: dict):
@@ -283,15 +309,22 @@ async def process(text, personality):
     enhanced_input = f"""
     {memory_context}
     {relationship_context}
+    Agent context: {agent.context()}
+    Registered tools: {json.dumps(agent.registry.schemas())}
+    If a registered tool is needed, return only JSON in this shape: {{"tool": "name", "arguments": {{}}}}.
+    Never invent a tool name or execute an action outside the registered tools.
     User: {text}
     """
 
-    reply = await ask_ai(
-        enhanced_input,
-        personality,
-        facts,
-        conversation,
-    )
+    async def generate_reply():
+        return await ask_ai(
+            enhanced_input,
+            personality,
+            facts,
+            conversation,
+        )
+
+    reply = await agent.handle(text, generate_reply)
 
     if level >= 4:
         if not reply.endswith(("?", ".", "!")):

@@ -65,6 +65,19 @@ button, input, select {
 
 .hidden { display: none !important; }
 
+.agent-state {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--cyan);
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.82;
+  pointer-events: none;
+}
+
 /* =========================================================
    TOKEN GATE
    ========================================================= */

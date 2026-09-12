@@ -268,6 +268,17 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
   let lastX = 0;
   let lastY = 0;
   let state = "idle";
+  const stateColors = {
+    idle: 0xffd36a,
+    listening: 0x4de1d0,
+    thinking: 0xa78bfa,
+    searching: 0x55b7ff,
+    executing: 0xffa23c,
+    waiting_confirmation: 0xffd166,
+    speaking: 0xff9a32,
+    error: 0xff6b6b,
+  };
+  const activeStateColor = new THREE.Color(stateColors.idle);
   let disposed = false;
 
   const pointerDown = (event) => {
@@ -333,7 +344,19 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
     frame = requestAnimationFrame(animate);
     const elapsed = clock.getElapsedTime();
     const pulse = (Math.sin(elapsed * 3.2) + 1) / 2;
-    const stateGlow = { idle: 1, listening: 1.3, thinking: 1.15, speaking: 1.6 }[state] || 1;
+    const stateGlow = {
+      idle: 1,
+      listening: 1.3,
+      thinking: 1.15,
+      searching: 1.35,
+      executing: 1.5,
+      waiting_confirmation: 1.45,
+      speaking: 1.6,
+      error: 0.8,
+    }[state] || 1;
+    activeStateColor.setHex(stateColors[state] || stateColors.idle);
+    core.material.color.lerp(activeStateColor, 0.08);
+    innerCore.material.color.lerp(activeStateColor, 0.08);
 
     rotationX = THREE.MathUtils.lerp(rotationX, targetRotationX, 0.08);
     rotationY = THREE.MathUtils.lerp(rotationY, targetRotationY, 0.08);

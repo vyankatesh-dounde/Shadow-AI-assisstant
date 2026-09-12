@@ -20,6 +20,7 @@ This project is meant to be simple and self-hosted, with a clean split between U
 - Reminder parsing and background reminder checking
 - Memory and fact extraction for recurring user context
 - Windows desktop control for app/window/volume/power actions
+- Map-based restaurant and movie-theater discovery with available contact details
 - TTS response playback in the browser
 - LAN accessibility from phone, tablet, or laptop
 - Authenticated API token protection for trusted local use
@@ -40,6 +41,7 @@ flowchart LR
 
     subgraph Function[Function Layer]
         Brain[core/brain.py\nmessage routing]
+        Agent[agent/\nconversation + tasks + planning]
         AI[ai/llm.py\nOllama model calls]
         Memory[core/memory.py\nconversation + facts]
         Reminders[core/reminders.py\nreminder logic]
@@ -49,6 +51,7 @@ flowchart LR
 
     Browser -->|chat / voice / actions| Server
     Server --> Brain
+    Brain --> Agent
     Brain --> AI
     Brain --> Memory
     Brain --> Reminders
@@ -91,7 +94,25 @@ This is the brain of the project. It contains reusable functions for:
 
 This is the layer that actually decides what Shadow should do.
 
-### 3. Connection Layer
+### 3. Agent Layer
+Location: `agent/`
+
+The agent layer adds persistent conversational task state around the existing
+handlers. It contains:
+
+- conversation state and task slot filling
+- intent planning for movie, restaurant, and food workflows
+- a central tool registry with schemas and permission levels
+- registered web, system, file, reminder, desktop, and map tools
+- movie, restaurant, and food discovery after task slots are complete
+- validated tool execution with confirmation and action logging
+- argument-type validation with explicit waiting and error states
+- WebSocket agent-state updates, voice interruption, and TTS cancellation
+- automated coverage for state, tasks, tools, confirmations, routing, and workflows
+- strict structured LLM tool calls validated against the central registry
+- cancellable pending tasks and confirmation prompts
+
+### 4. Connection Layer
 Location: `server.py` and `integrations/`
 
 This layer exposes the system to browser clients and background event processing. It handles:
@@ -110,9 +131,10 @@ This layer acts as the bridge between the browser and the function layer.
 ### Chat flow
 1. The browser sends a chat message or voice transcript.
 2. `server.py` receives it and routes it to `core.brain.process()`.
-3. The brain checks for commands, reminders, memory tasks, skills, or general AI queries.
-4. A response is generated via the LLM or local function handlers.
-5. The result is sent back to the browser and optionally spoken using TTS.
+3. The brain checks wake-word handling and existing deterministic commands first.
+4. The agent manages task state, missing slots, cancellation, and confirmations.
+5. The LLM handles the remaining conversational response.
+6. The result is sent back to the browser and optionally spoken using TTS.
 
 ### Reminder flow
 1. The user creates a reminder in the dashboard.
@@ -138,11 +160,21 @@ Shadow-AI/
 ├── ARCHITECTURE.md           # Architecture notes
 ├── ai/
 │   └── llm.py                # Ollama-backed LLM interaction
+├── agent/
+│   ├── agent.py              # Agent orchestration and task continuation
+│   ├── conversation.py       # Persistent agent state
+│   ├── confirmation.py       # Confirmation and cancellation helpers
+│   ├── planner.py            # Task intent and slot planning
+│   ├── schemas.py            # Tool, permission, and state schemas
+│   ├── task_manager.py       # Active task and slot management
+│   ├── tool_executor.py      # Validation, confirmation, execution, logging
+│   └── tool_registry.py      # Registered tool definitions
 ├── core/
 │   ├── action_service.py     # Shared action execution entry point
 │   ├── brain.py              # Core command and response routing
 │   ├── desktop_control.py    # Windows desktop automation
 │   ├── file_indexer.py       # Local file indexing/search support
+│   ├── maps_search.py         # Read-only OpenStreetMap place lookup
 │   ├── memory.py             # Conversation and fact memory
 │   ├── memory_extractor.py   # Memory extraction logic
 │   ├── math_engine.py        # Math helpers
@@ -220,6 +252,9 @@ python server.py
 
 - Use a strong token if the app is reachable on your local network.
 - `HOST` in `config.py` is the network binding, so keep it appropriate for your environment.
+- Non-local `HOST` values require `ENABLE_AUTH = True` at startup.
+- Set explicit `ALLOWED_ORIGINS` values when serving the dashboard beyond localhost.
+- WebSocket chat is rate-limited to prevent accidental or hostile message floods.
 - `ENABLE_AUTH = False` should only be used in fully trusted environments.
 - Desktop control actions that can restart, sleep, close, or stop services require confirmation.
 
@@ -239,6 +274,39 @@ Possible next improvements include:
 - more advanced application and file orchestration
 - richer notifications when the browser tab is not active
 - optional persistent personal assistant profiles
+
+## Call Book
+
+Add manual contacts to `memory/call_book.json`:
+
+```json
+{
+    "family": {
+        "Mom": {"phone": "+1 555 0100", "notes": "Personal"}
+    },
+    "hotels": {
+        "Example Hotel": {"phone": "+1 555 0200"}
+    },
+    "box_office": {
+        "Example Cinema": {"phone": "+1 555 0300"}
+    }
+}
+```
+
+Say `call Mom`, `call Example Hotel`, or `call Example Cinema`. Shadow asks
+for confirmation before opening the phone link.
+
+## Phase Progress
+
+- Foundation, intelligence, actions, safety, experience, testing, and security scaffolding are implemented.
+- Phase 4 discovery is active for movies, restaurants, and food. Booking, reservation, and ordering boundaries are confirmation-gated but remain disabled until real providers are configured.
+- Phase 5 preference history records value, timestamp, source, and active/removed state beside the legacy facts store.
+- Phase 7 safety confirmation requests expire after five minutes and cannot execute stale actions.
+- Phase 8 voice interruption cancels active work and TTS through the microphone control or WebSocket.
+- Phase 9 hologram/UI exposes the live agent state with a HUD label and state-specific visual color.
+- Phase 10 keeps the FastAPI/WebSocket process path and restores the current agent state on client connect.
+- Phase 11 applies origin checks, local-only authentication guards, rate limits, and HTTP security headers.
+- Phase 12 covers multi-turn continuation, corrections, cancellation, confirmation, routing, and provider failures.
 
 ## Summary
 
