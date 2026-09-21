@@ -1,50 +1,10 @@
 [
   {
     "role": "user",
-    "content": "search for Spider-Man"
+    "content": "search for JavaScript language"
   },
   {
     "role": "assistant",
-    "content": "Web results for: Spider-Man\n1. Spider-Man\n   https://en.wikipedia.org/wiki/Spider-Man\n   Spider-Man is a superhero in American comic books published by Marvel Comics. Created by writer-editor Stan Lee and artist Steve Ditko, he first appeared in the anthology comic book Amazing Fantasy #15 in the Silver Age of Comic Books. Widely regarded as one of the most popular and commercially successful superheroes, he has been featured in comic books, television shows, films, video games, novels, and plays. Spider-Man's secret identity is Peter Benjamin Parker, who was raised by his Aunt May and Uncle Ben in Queens, New York City, after the death of his parents. Lee, Ditko, and later writers had the character deal with the struggles of adolescence and young adulthood. Readers identified with his self-doubt and loneliness. Unlike previous teen heroes, Spider-Man would be given many supporting characters.\n2. Spider-Man Category\n   https://duckduckgo.com/c/Spider-Man\n   Spider-Man Category\n3. Spiders in popular culture\n   https://duckduckgo.com/c/Spiders_in_popular_culture\n   Spiders in popular culture\n4. Comics by Stan Lee\n   https://duckduckgo.com/c/Comics_by_Stan_Lee\n   Comics by Stan Lee\n5. Comics by Steve Ditko\n   https://duckduckgo.com/c/Comics_by_Steve_Ditko\n   Comics by Steve Ditko"
-  },
-  {
-    "role": "user",
-    "content": "are you connected"
-  },
-  {
-    "role": "user",
-    "content": "open C drive"
-  },
-  {
-    "role": "assistant",
-    "content": "Opening it now."
-  },
-  {
-    "role": "user",
-    "content": "open games folder"
-  },
-  {
-    "role": "assistant",
-    "content": "Opening games"
-  },
-  {
-    "role": "user",
-    "content": "Watch Dogs"
-  },
-  {
-    "role": "user",
-    "content": "open Watch Dogs"
-  },
-  {
-    "role": "assistant",
-    "content": "Opening watch dogs"
-  },
-  {
-    "role": "user",
-    "content": "search for python"
-  },
-  {
-    "role": "assistant",
-    "content": "Web results for: python\n1. PYTHON\n   https://en.wikipedia.org/wiki/PYTHON\n   PYTHON was a Cold War contingency plan of the British Government for the continuity of government in the event of nuclear war.\n2. Cold War history of the United Kingdom\n   https://duckduckgo.com/c/Cold_War_history_of_the_United_Kingdom\n   Cold War history of the United Kingdom\n3. United Kingdom nuclear command and control\n   https://duckduckgo.com/c/United_Kingdom_nuclear_command_and_control\n   United Kingdom nuclear command and control\n4. Continuity of government\n   https://duckduckgo.com/c/Continuity_of_government\n   Continuity of government\n5. Emergency management in the United Kingdom\n   https://duckduckgo.com/c/Emergency_management_in_the_United_Kingdom\n   Emergency management in the United Kingdom"
+    "content": "Web results for: JavaScript language\n1. JavaScript\n   https://en.wikipedia.org/wiki/JavaScript\n   JavaScript is a programming language and core technology of the Web, alongside HTML and CSS. Created by Brendan Eich in 1995, it is maintained by Ecma International's TC39 technical committee, with related Web APIs maintained by W3C and WHATWG. As of 2025, JavaScript is the most widely used programming language on GitHub. However, TypeScript, which is a version of JavaScript that is strict about types and is statically typed, overtook JavaScript on GitHub by August 2025. Web browsers have a dedicated JavaScript engine that executes the client code. These engines are also utilized in some servers and a variety of apps. The most popular runtime system for non-browser usage is Node.js. JavaScript is a high-level, often just-in-time–compiled language that conforms to the ECMAScript standard. It has dynamic typing, prototype-based object-orientation, and first-class functions. It is multi-paradigm, supporting event-driven, functional, and imperative programming styles."
   }
 ]

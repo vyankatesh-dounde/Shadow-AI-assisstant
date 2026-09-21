@@ -243,7 +243,7 @@ def _store_ai_extracted_memory(memory: dict):
             save_fact(k, v)
 
 
-async def process(text, personality):
+async def process(text, personality, on_chunk=None):
     lower = text.lower().strip()
 
     # =========================================================
@@ -322,6 +322,7 @@ async def process(text, personality):
             personality,
             facts,
             conversation,
+            on_chunk=on_chunk,
         )
 
     reply = await agent.handle(text, generate_reply)

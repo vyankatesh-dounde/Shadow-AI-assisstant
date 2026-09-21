@@ -201,6 +201,8 @@
     }
   }
 
+  let activeAssistantBubble = null;
+
   function handleMessage(data) {
     switch (data.type) {
       case "conversation":
@@ -209,7 +211,33 @@
       case "user_message":
         addBubble("user", data.text);
         break;
+      case "response_start":
+        activeAssistantBubble = addBubble("assistant", "", null, true);
+        break;
+      case "response_chunk":
+        if (!activeAssistantBubble) {
+          activeAssistantBubble = addBubble("assistant", "", null, true);
+        }
+        const chunk = String(data.text || "");
+        if (chunk) {
+          activeAssistantBubble.body.textContent += chunk;
+          scrollToBottom();
+        }
+        break;
+      case "response_end":
+        if (activeAssistantBubble) {
+          const finalText = String(data.text || activeAssistantBubble.body.textContent || "");
+          activeAssistantBubble.body.textContent = finalText;
+          activeAssistantBubble = null;
+        }
+        setPresence("idle");
+        playAudio(data.audio_url);
+        refreshInsights();
+        break;
       case "response":
+        if (activeAssistantBubble) {
+          return;
+        }
         setPresence("idle");
         addBubble("assistant", data.text, data.audio_url);
         playAudio(data.audio_url);
@@ -723,6 +751,7 @@
 
     chatScroll.appendChild(div);
     if (autoScroll) scrollToBottom();
+    return { div, body };
   }
 
   function scrollToBottom() {

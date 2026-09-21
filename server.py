@@ -300,9 +300,20 @@ async def handle_chat_message(text: str):
     agent.conversation.update(state=AgentState.THINKING)
     await broadcast_agent_state()
 
+    stream_started = False
+
+    async def on_chunk(chunk: str):
+        nonlocal stream_started
+        if not chunk:
+            return
+        if not stream_started:
+            await manager.broadcast({"type": "response_start", "text": ""})
+            stream_started = True
+        await manager.broadcast({"type": "response_chunk", "text": chunk})
+
     try:
         async with chat_lock:
-            reply = await process(text, personality)
+            reply = await process(text, personality, on_chunk=on_chunk)
     except asyncio.CancelledError:
         agent.conversation.update(state=AgentState.IDLE)
         await broadcast_agent_state()
@@ -314,11 +325,18 @@ async def handle_chat_message(text: str):
     except Exception as e:
         print("TTS error:", e)
 
-    await manager.broadcast({
-        "type": "response",
-        "text": reply,
-        "audio_url": audio_url,
-    })
+    if stream_started:
+        await manager.broadcast({
+            "type": "response_end",
+            "text": reply,
+            "audio_url": audio_url,
+        })
+    else:
+        await manager.broadcast({
+            "type": "response",
+            "text": reply,
+            "audio_url": audio_url,
+        })
     await broadcast_agent_state()
     await manager.broadcast({
         "type": "reminders_updated",

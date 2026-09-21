@@ -3,7 +3,7 @@
 import requests
 
 
-MAX_RESULTS = 5
+MAX_RESULTS = 1
 
 
 def search_web(query: str) -> list[dict]:

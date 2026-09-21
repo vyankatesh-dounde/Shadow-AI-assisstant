@@ -1,0 +1,9 @@
+{
+  "active_task": null,
+  "intent": null,
+  "slots": {},
+  "pending_confirmation": null,
+  "previous_tool_result": null,
+  "last_question": null,
+  "state": "THINKING"
+}

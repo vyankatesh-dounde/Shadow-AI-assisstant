@@ -1,4 +1,6 @@
 import asyncio
+import json
+
 import requests
 from config import OLLAMA_URL, OLLAMA_MODEL
 
@@ -19,11 +21,26 @@ def _call_ollama(payload):
     """Blocking network call - run via asyncio.to_thread so it never
     freezes the FastAPI event loop (and every other connected browser)
     while Ollama is thinking."""
-    response = requests.post(OLLAMA_URL, json=payload, timeout=60)
+    response = requests.post(OLLAMA_URL, json=payload, timeout=60, stream=payload.get("stream", False))
+    if payload.get("stream", False):
+        chunks = []
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            text_piece = data.get("response", "")
+            if text_piece:
+                chunks.append(text_piece)
+            if data.get("done"):
+                break
+        return "".join(chunks)
     return response.json()
 
 
-async def ask_ai(text, personality, facts, conversation):
+async def ask_ai(text, personality, facts, conversation, on_chunk=None):
     system_prompt = f"""
 You are Shadow.
 
@@ -64,13 +81,32 @@ Adjust response length based on question.
     payload = {
         "model": OLLAMA_MODEL,
         "prompt": full_prompt,
-        "stream": False   # ✅ VERY IMPORTANT
+        "stream": True,
     }
 
     try:
-        data = await asyncio.to_thread(_call_ollama, payload)
-
-        reply = data.get("response", "")
+        if on_chunk is None:
+            data = await asyncio.to_thread(_call_ollama, payload)
+            reply = data.get("response", "") if isinstance(data, dict) else str(data or "")
+        else:
+            response = requests.post(OLLAMA_URL, json=payload, timeout=60, stream=True)
+            response.raise_for_status()
+            buffer = []
+            for line in response.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                text_piece = data.get("response", "")
+                if not text_piece:
+                    continue
+                buffer.append(text_piece)
+                on_chunk(text_piece)
+                if data.get("done"):
+                    break
+            reply = "".join(buffer)
 
         reply = reply.strip()
 

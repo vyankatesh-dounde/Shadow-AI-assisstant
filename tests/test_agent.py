@@ -9,6 +9,8 @@ from agent.agent import Agent
 from agent.conversation import ConversationManager
 from agent.schemas import AgentState, PermissionLevel, ToolRequest, ToolSpec
 from core.brain import _cmd_place_search
+from core.personality import Personality
+from ai.llm import ask_ai
 
 
 class AgentTestCase(unittest.IsolatedAsyncioTestCase):
@@ -128,6 +130,36 @@ class AgentTestCase(unittest.IsolatedAsyncioTestCase):
         record = json.loads(self.agent.executor.log_file.read_text().splitlines()[-1])
         self.assertEqual(record["error"], "invalid_arguments")
         self.assertFalse(record["success"])
+
+    async def test_ask_ai_streams_response_chunks(self):
+        chunks = []
+
+        class FakeResponse:
+            def __init__(self):
+                self._payload = [
+                    '{"model":"phi3","created_at":"...","response":"Hello "}',
+                    '{"model":"phi3","created_at":"...","response":"there"}',
+                    '{"model":"phi3","created_at":"...","response":"!","done":true}',
+                ]
+
+            def raise_for_status(self):
+                return None
+
+            def iter_lines(self, chunk_size=None, decode_unicode=True):
+                for item in self._payload:
+                    yield item
+
+        with patch("ai.llm.requests.post", return_value=FakeResponse()):
+            reply = await ask_ai(
+                "hello",
+                Personality(),
+                {},
+                [],
+                on_chunk=lambda chunk: chunks.append(chunk),
+            )
+
+        self.assertEqual(reply, "Hello there!")
+        self.assertEqual("".join(chunks), "Hello there!")
 
     async def test_structured_llm_tool_call_uses_registered_executor(self):
         self.agent.registry.register(ToolSpec(
