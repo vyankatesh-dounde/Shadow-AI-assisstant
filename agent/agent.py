@@ -1,12 +1,9 @@
 import re
 from typing import Any, Awaitable, Callable
 
-from core.maps_search import search_places_and_format
-from core.desktop_control import close_app, open_app, open_website
-from core.call_book import call_contact, find_contact
-from core.file_indexer import build_index, open_indexed
-from core.reminders import add_reminder, delete_reminder, list_reminders
-from core.real_world_tools import (
+from core.discovery import (
+    search_places_and_format,
+    search_and_format,
     book_movie,
     place_food_order,
     reserve_restaurant,
@@ -14,8 +11,10 @@ from core.real_world_tools import (
     search_movie_options,
     search_restaurant_options,
 )
+from core.desktop_control import close_app, open_app, open_website, build_index, open_indexed
+from core.call_book import call_contact, find_contact
+from core.reminders import add_reminder, delete_reminder, list_reminders
 from core.system_status import get_status
-from core.web_search import search_and_format
 from .confirmation import confirmation_expired, is_cancellation, is_confirmation
 from .conversation import ConversationManager
 from .planner import Planner
@@ -186,6 +185,16 @@ class Agent:
             return {"date": text.strip()}
         return {}
 
+    @staticmethod
+    def _is_new_question(text: str) -> bool:
+        clean = text.casefold().strip()
+        return clean.endswith("?") or bool(re.match(
+            r"^(?:i\s+(?:asked|meant|was asking)|i'm\s+asking|"
+            r"what|why|how|when|where|who|which|is|are|am|do|does|did|"
+            r"can|could|would|should|will|have|has)\b",
+            clean,
+        ))
+
     def context(self) -> dict[str, Any]:
         return self.conversation.context()
 
@@ -260,6 +269,10 @@ class Agent:
         if clean in {"cancel", "stop", "never mind", "forget it"} and state.active_task:
             self.tasks.cancel()
             return "Okay, I cancelled the active task."
+
+        if state.active_task and state.last_question and self._is_new_question(text):
+            self.tasks.cancel()
+            state = self.conversation.state
 
         call_request = self._call_request(text)
         if call_request:

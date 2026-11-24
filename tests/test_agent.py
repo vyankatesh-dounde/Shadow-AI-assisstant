@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from agent.agent import Agent
 from agent.conversation import ConversationManager
@@ -137,29 +137,64 @@ class AgentTestCase(unittest.IsolatedAsyncioTestCase):
         class FakeResponse:
             def __init__(self):
                 self._payload = [
-                    '{"model":"phi3","created_at":"...","response":"Hello "}',
-                    '{"model":"phi3","created_at":"...","response":"there"}',
-                    '{"model":"phi3","created_at":"...","response":"!","done":true}',
+                    'data: {"choices":[{"delta":{"content":"Hello "}}]}',
+                    'data: {"choices":[{"delta":{"content":"there"}}]}',
+                    'data: {"choices":[{"delta":{"content":"!"}}]}',
+                    "data: [DONE]",
                 ]
 
             def raise_for_status(self):
                 return None
 
-            def iter_lines(self, chunk_size=None, decode_unicode=True):
+            async def aiter_lines(self):
                 for item in self._payload:
                     yield item
 
-        with patch("ai.llm.requests.post", return_value=FakeResponse()):
+        with patch("ai.llm._http_client.stream", new_callable=MagicMock) as stream_mock:
+            stream_context = AsyncMock()
+            stream_context.__aenter__.return_value = FakeResponse()
+            stream_mock.return_value = stream_context
+            async def on_chunk(chunk):
+                chunks.append(chunk)
+
             reply = await ask_ai(
                 "hello",
                 Personality(),
                 {},
                 [],
-                on_chunk=lambda chunk: chunks.append(chunk),
+                on_chunk=on_chunk,
             )
 
         self.assertEqual(reply, "Hello there!")
         self.assertEqual("".join(chunks), "Hello there!")
+        self.assertEqual(
+            stream_mock.call_args.args[1],
+            "http://localhost:8080/v1/chat/completions",
+        )
+        payload = stream_mock.call_args.kwargs["json"]
+        self.assertEqual(payload["model"], "Qwen3.5-2B-Q4_K_M")
+        self.assertEqual(payload["messages"][-1], {"role": "user", "content": "hello"})
+        self.assertIn(
+            "always reply in Marathi using Devanagari script",
+            payload["messages"][0]["content"],
+        )
+
+    async def test_ask_ai_collects_stream_without_chunk_callback(self):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            async def aiter_lines(self):
+                yield 'data: {"choices":[{"delta":{"content":"Local "}}]}'
+                yield 'data: {"choices":[{"delta":{"content":"reply"}}]}'
+                yield "data: [DONE]"
+        with patch("ai.llm._http_client.stream", new_callable=MagicMock) as stream_mock:
+            stream_context = AsyncMock()
+            stream_context.__aenter__.return_value = FakeResponse()
+            stream_mock.return_value = stream_context
+            reply = await ask_ai("hello", Personality(), {}, [])
+
+        self.assertEqual(reply, "Local reply")
 
     async def test_structured_llm_tool_call_uses_registered_executor(self):
         self.agent.registry.register(ToolSpec(

@@ -2,16 +2,16 @@ ASSISTANT_NAME = "Shadow"
 
 DEFAULT_MODE = "assistant"
 
-VOICE = "en-US-BrianNeural"
+VOICE = "ja-JP-KeitaNeural"
 VOICE_PITCH = "-2Hz"
 USE_RVC_VOICE = False
 
-OLLAMA_MODEL = "phi3"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+LLAMA_CPP_MODEL = "Qwen3.5-2B-Q4_K_M"
+LLAMA_CPP_URL = "http://localhost:8080/v1/chat/completions"
 
 # Words that wake the dashboard's microphone out of passive listening.
 # Used by static/js/app.js (kept here too so server + client agree).
-WAKE_WORDS = ["hey shadow", "shadow"]
+WAKE_WORDS = ["hey shadow", "shadow", "हे शॅडो", "हाय शॅडो", "शॅडो"]
 
 # ====
 # 🌐 WEB SERVER SETTINGS
@@ -52,3 +52,7 @@ STATUS_BROADCAST_INTERVAL = 3
 # local assistant and prevent an accidental or hostile message flood.
 CHAT_RATE_LIMIT_WINDOW_SECONDS = 10
 CHAT_RATE_LIMIT_MAX_MESSAGES = 12
+
+# Static assets default to no-store for predictable development reloads.
+# Set to "public, max-age=3600" for normal local use after a stable build.
+STATIC_CACHE_CONTROL = "no-store, no-cache, must-revalidate"

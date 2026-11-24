@@ -30,7 +30,8 @@ async def broadcast_status(manager):
     while True:
         try:
             if manager.active:
-                await manager.broadcast({"type": "status", **get_status()})
+                status = await asyncio.to_thread(get_status)
+                await manager.broadcast({"type": "status", **status})
         except Exception as error:
             print("Status broadcaster error:", error)
         await asyncio.sleep(STATUS_BROADCAST_INTERVAL)

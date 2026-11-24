@@ -4,6 +4,7 @@ import subprocess
 import webbrowser
 import pyautogui
 from pathlib import Path
+from memory.storage import rebuild_file_index, search_file_index
 
 # =========================
 # 🧠 SMART FILE SEARCH (fallback)
@@ -78,9 +79,17 @@ def open_drive(text: str):
 
 def find_file_or_folder(name: str):
     name = name.lower()
+    indexed = search_index(name)
+    if indexed and os.path.exists(indexed):
+        return indexed
 
     for base in SEARCH_PATHS:
         for root, dirs, files in os.walk(base):
+            dirs[:] = [
+                directory for directory in dirs
+                if directory.lower() not in {"node_modules", ".git", "appdata", "windows"}
+                and not directory.lower().startswith(".")
+            ]
             try:
                 for d in dirs:
                     if name in d.lower():
@@ -93,6 +102,23 @@ def find_file_or_folder(name: str):
                 continue
 
     return None
+
+
+def search_index(query: str):
+    return search_file_index(query)
+
+
+def build_index():
+    count = rebuild_file_index()
+    return f"Indexed {count} items."
+
+
+def open_indexed(query: str):
+    path = search_index(query)
+    if path:
+        os.startfile(path)
+        return f"Opening {query}"
+    return f"I couldn't find {query}"
 
 
 def open_smart(name: str):

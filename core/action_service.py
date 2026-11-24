@@ -7,9 +7,8 @@ from core.desktop_control import (
     cancel_shutdown, close_app, close_window, minimize_all, open_app,
     open_smart, open_website, play_pause, restart, search_google, sleep_pc,
     show_all_windows, switch_window, switch_window_back, type_text,
-    volume_down, volume_up,
+    volume_down, volume_up, build_index, open_indexed,
 )
-from core.file_indexer import build_index, open_indexed
 from core.server_control import stop_server
 
 

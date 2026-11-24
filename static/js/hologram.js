@@ -21,14 +21,20 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
     alpha: false,
     powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const mobile = window.matchMedia("(max-width: 700px)").matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 2));
   renderer.setSize(1, 1, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
 
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 1.35, 0.65, 0.12);
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(1, 1),
+    mobile ? 0.9 : 1.35,
+    mobile ? 0.45 : 0.65,
+    0.12,
+  );
   composer.addPass(bloom);
 
   const gold = new THREE.Color(0xff9a32);
@@ -150,7 +156,7 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
   }
 
   // ---- particles ----
-  const particleCount = 1800;
+  const particleCount = mobile ? 900 : 1800;
   const positions = new Float32Array(particleCount * 3);
   const particleData = [];
 
@@ -338,9 +344,10 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
 
   const clock = new THREE.Clock();
   let frame = 0;
+  let suspended = document.hidden;
 
   function animate() {
-    if (disposed) return;
+    if (disposed || suspended) return;
     frame = requestAnimationFrame(animate);
     const elapsed = clock.getElapsedTime();
     const pulse = (Math.sin(elapsed * 3.2) + 1) / 2;
@@ -407,6 +414,17 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
     composer.render();
   }
 
+  function handleVisibilityChange() {
+    suspended = document.hidden;
+    if (suspended) {
+      cancelAnimationFrame(frame);
+    } else {
+      clock.getDelta();
+      animate();
+    }
+  }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
   const api = {
     resize,
     setState(nextState) {
@@ -415,6 +433,7 @@ export function createHologram(canvas, { stage = canvas.parentElement } = {}) {
     dispose() {
       disposed = true;
       cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("pointerdown", pointerDown);

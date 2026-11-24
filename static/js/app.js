@@ -6,19 +6,9 @@
 (() => {
   "use strict";
 
-  // If you don't see this line in DevTools > Console after a hard
-  // refresh (Ctrl+Shift+R / Cmd+Shift+R), the browser is still
-  // serving a cached copy of this file - that's the #1 cause of "I
-  // updated the code but nothing changed."
-
-  console.log("[Shadow] app.js build 2026-09-05-3d-hologram-layer-fix");
-
-  console.log("[Shadow] app.js build 2026-08-12-recognizer-error-fix");
-
-
   const TOKEN_KEY = "shadow_token";
   const WAKE_KEY = "shadow_wake_enabled";
-  const WAKE_WORDS = ["hey shadow", "shadow"];
+  const WAKE_WORDS = ["hey shadow", "shadow", "हे शॅडो", "हाय शॅडो", "शॅडो"];
 
   const el = (id) => document.getElementById(id);
 
@@ -62,6 +52,9 @@
   const relationshipLast = el("relationship-last");
 
   let ws = null;
+  let audioPeer = null;
+  let audioSessionId = null;
+  let audioSpeechReceived = false;
   let reconnectDelay = 1000;
   let reconnectAttempts = 0;
   const MAX_RECONNECT_ATTEMPTS = 6;
@@ -171,6 +164,8 @@
     };
 
     ws.onclose = () => {
+      closeAudioPeer();
+      audioSpeechReceived = false;
       connIndicator.dataset.state = "offline";
       connIndicator.querySelector(".conn-label").textContent = "offline";
 
@@ -230,18 +225,30 @@
           activeAssistantBubble.body.textContent = finalText;
           activeAssistantBubble = null;
         }
-        setPresence("idle");
-        playAudio(data.audio_url);
+        if (audioSpeechReceived) {
+          audioSpeechReceived = false;
+        } else {
+          setPresence("idle");
+          closeAudioPeer();
+          playAudio(data.audio_url, null, String(data.text || ""));
+        }
         refreshInsights();
         break;
       case "response":
         if (activeAssistantBubble) {
           return;
         }
+        closeAudioPeer();
         setPresence("idle");
         addBubble("assistant", data.text, data.audio_url);
-        playAudio(data.audio_url);
+        playAudio(data.audio_url, null, String(data.text || ""));
         refreshInsights();
+        break;
+      case "webrtc_audio_started":
+        if (data.session_id === audioSessionId) {
+          audioSpeechReceived = true;
+          setPresence("speaking");
+        }
         break;
       case "agent_state":
         setPresence(String(data.state || "IDLE").toLowerCase());
@@ -258,7 +265,7 @@
 
 
         addBubble("system", `⏰ ${data.text}`);
-        playAudio(data.audio_url);
+        playAudio(data.audio_url, null, String(data.text || ""));
         notify("Shadow reminder", data.text);
         break;
 
@@ -364,7 +371,6 @@
 
   let audioUnlocked = false;
   let pendingAudioUrl = null;
-  let audioRetryTimer = null;
 
   // -------------------------------------------------------
   // UNLOCK AUDIO
@@ -378,7 +384,11 @@
   //
 
   function unlockTtsAudio() {
-    if (audioUnlocked || !ttsAudio) return;
+    if (!ttsAudio) return;
+    if (audioUnlocked) {
+      flushPendingAudio();
+      return;
+    }
 
     try {
       // Temporarily remove the source.
@@ -424,37 +434,6 @@
         error
       );
     }
-  }
-
-
-  // -------------------------------------------------------
-  // RETRY QUEUE
-  // -------------------------------------------------------
-
-  function scheduleAudioRetry() {
-
-    if (audioRetryTimer) {
-      return;
-    }
-
-    audioRetryTimer = setTimeout(() => {
-
-      audioRetryTimer = null;
-
-      if (!pendingAudioUrl) {
-        return;
-      }
-
-      // Try immediately if the Shadow tab is visible.
-      if (!document.hidden) {
-        const url = pendingAudioUrl;
-
-        pendingAudioUrl = null;
-
-        playAudio(url);
-      }
-
-    }, 700);
   }
 
 
@@ -531,11 +510,23 @@
   // MAIN PLAY AUDIO FUNCTION
   // -------------------------------------------------------
 
-  function playAudio(url, onDone) {
+  function playAudio(url, onDone, fallbackText = "") {
+
+    const speakFallback = () => {
+      if (!fallbackText) {
+        if (onDone) onDone();
+        return;
+      }
+      setPresence("speaking");
+      speakLocal(fallbackText, () => {
+        setPresence("idle");
+        if (onDone) onDone();
+      });
+    };
 
     if (!url) {
       console.debug("[Shadow][audio] No audio URL");
-      if (onDone) onDone();
+      speakFallback();
       return;
     }
 
@@ -594,8 +585,7 @@
           pendingAudioUrl = null;
         }
 
-        setPresence("idle");
-        if (onDone) onDone();
+        speakFallback();
       };
 
 
@@ -643,25 +633,18 @@
             );
 
 
-            // Keep the audio URL so we can retry.
-            pendingAudioUrl = url;
-
-
-            // If this was an autoplay restriction,
-            // playback will be retried after interaction.
             if (
               error.name === "NotAllowedError" ||
               error.name === "AbortError"
             ) {
-
+              // Keep the URL for the next user gesture or focus event.
+              pendingAudioUrl = url;
               console.warn(
                 "[Shadow][audio] Chrome blocked automatic playback"
               );
-
+            } else {
+              speakFallback();
             }
-
-
-            scheduleAudioRetry();
 
           });
 
@@ -674,19 +657,15 @@
         error
       );
 
-      pendingAudioUrl = url;
-
-      scheduleAudioRetry();
+      speakFallback();
     }
 
   }
 
   function stopAudioPlayback() {
     pendingAudioUrl = null;
-    if (audioRetryTimer) {
-      clearTimeout(audioRetryTimer);
-      audioRetryTimer = null;
-    }
+    audioSpeechReceived = false;
+    closeAudioPeer();
     if (ttsAudio) {
       ttsAudio.onended = null;
       ttsAudio.onerror = null;
@@ -700,6 +679,107 @@
   // ======
   // CHAT
   // ======
+
+  function closeAudioPeer() {
+    const sessionId = audioSessionId;
+    if (sessionId) {
+      api(`/api/webrtc/${encodeURIComponent(sessionId)}`, { method: "DELETE" })
+        .catch((error) => console.warn("[Shadow][audio] WebRTC cleanup failed:", error));
+    }
+    audioSessionId = null;
+    if (audioPeer) {
+      audioPeer.close();
+      audioPeer = null;
+    }
+    if (ttsAudio?.srcObject) {
+      ttsAudio.pause();
+      ttsAudio.srcObject = null;
+      ttsAudio.load();
+    }
+  }
+
+  function waitForIceGathering(peer) {
+    if (peer.iceGatheringState === "complete") return Promise.resolve();
+    return new Promise((resolve) => {
+      let timeout;
+      const cleanup = () => {
+        clearTimeout(timeout);
+        peer.removeEventListener("icegatheringstatechange", onStateChange);
+      };
+      const onStateChange = () => {
+        if (peer.iceGatheringState === "complete") {
+          cleanup();
+          resolve();
+        }
+      };
+      peer.addEventListener("icegatheringstatechange", onStateChange);
+      timeout = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 5000);
+      onStateChange();
+    });
+  }
+
+  function waitForPeerConnection(peer) {
+    if (peer.connectionState === "connected") return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timeout);
+        peer.removeEventListener("connectionstatechange", onStateChange);
+      };
+      const onStateChange = () => {
+        if (peer.connectionState === "connected") {
+          cleanup();
+          resolve();
+        } else if (["failed", "closed"].includes(peer.connectionState)) {
+          cleanup();
+          reject(new Error(`WebRTC connection ${peer.connectionState}`));
+        }
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("WebRTC connection timed out"));
+      }, 3000);
+      peer.addEventListener("connectionstatechange", onStateChange);
+      onStateChange();
+    });
+  }
+
+  async function prepareAudioPeer() {
+    if (!window.RTCPeerConnection) return null;
+    closeAudioPeer();
+    const peer = new RTCPeerConnection({ iceServers: [] });
+    audioPeer = peer;
+    peer.addTransceiver("audio", { direction: "recvonly" });
+    peer.ontrack = (event) => {
+      if (audioPeer !== peer || !ttsAudio) return;
+      ttsAudio.srcObject = event.streams[0];
+      ttsAudio.play().catch((error) => {
+        console.warn("[Shadow][audio] WebRTC playback failed:", error);
+      });
+      event.track.onended = () => {
+        if (audioPeer === peer) {
+          closeAudioPeer();
+          setPresence("idle");
+        }
+      };
+    };
+
+    await peer.setLocalDescription(await peer.createOffer());
+    await waitForIceGathering(peer);
+    const answer = await api("/api/webrtc/offer", {
+      method: "POST",
+      body: JSON.stringify({
+        sdp: peer.localDescription.sdp,
+        type: peer.localDescription.type,
+      }),
+    });
+    audioSessionId = answer.session_id;
+    await peer.setRemoteDescription(answer);
+    await waitForPeerConnection(peer);
+    return audioSessionId;
+  }
 
   function renderHistory(history) {
     chatScroll.innerHTML = "";
@@ -740,11 +820,11 @@
       div.title = "Tap to replay";
       div.addEventListener("click", () => {
         if (audioUrl) {
-          playAudio(audioUrl);
+          playAudio(audioUrl, null, text);
         } else {
           api("/api/tts", { method: "POST", body: JSON.stringify({ text }) })
-            .then((r) => playAudio(r.audio_url))
-            .catch(() => {});
+            .then((r) => playAudio(r.audio_url, null, text))
+            .catch(() => playAudio(null, null, text));
         }
       });
     }
@@ -758,12 +838,19 @@
     chatScroll.scrollTop = chatScroll.scrollHeight;
   }
 
-  function sendChat(text) {
+  async function sendChat(text) {
     const trimmed = (text || "").trim();
     if (!trimmed) return;
     stopAudioPlayback();
     setPresence("thinking");
-    send({ type: "chat", text: trimmed });
+    let sessionId = null;
+    try {
+      sessionId = await prepareAudioPeer();
+    } catch (error) {
+      console.warn("[Shadow][audio] WebRTC unavailable; using regular audio:", error);
+      closeAudioPeer();
+    }
+    send({ type: "chat", text: trimmed, audio_session_id: sessionId });
   }
 
   composer.addEventListener("submit", (e) => {
@@ -826,7 +913,7 @@
   let wakeEnabled = localStorage.getItem(WAKE_KEY) === "1";
 
   const GREET_KEY = "shadow_last_greeting_date";
-  const WAKE_ACK = "Yes?";
+  const WAKE_ACK = "हो, सांगा.";
 
   // `onDone` fires once the utterance has actually finished playing
   // through the speakers - callers use this to hold off reopening the
@@ -846,6 +933,7 @@
       window.speechSynthesis.cancel(); // don't stack up acknowledgments
 
       const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "mr-IN";
       let settled = false;
       const settle = () => {
         if (settled) return;
@@ -878,8 +966,8 @@
     if (localStorage.getItem(GREET_KEY) !== today) {
       localStorage.setItem(GREET_KEY, today);
       const hour = new Date().getHours();
-      const part = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-      line = `${part}. How can I help?`;
+      const part = hour < 12 ? "शुभ सकाळ" : hour < 17 ? "शुभ दुपार" : "शुभ संध्याकाळ";
+      line = `${part}. सांगा, काय मदत हवी?`;
     } else {
       line = WAKE_ACK;
     }
@@ -981,7 +1069,7 @@
 
   if (SpeechRecognitionImpl) {
     recognizer = new SpeechRecognitionImpl();
-    recognizer.lang = "en-US";
+    recognizer.lang = "mr-IN";
     recognizer.maxAlternatives = 3;
 
     // Actually configures + starts the recognizer for `mode`. Only

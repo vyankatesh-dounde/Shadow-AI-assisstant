@@ -1,5 +1,6 @@
 import asyncio 
 import hmac
+import re
 import sys
 import time
 from collections import deque
@@ -15,21 +16,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import (
     ASSISTANT_NAME, HOST, PORT, ENABLE_AUTH, API_TOKEN, ALLOWED_ORIGINS,
     CHAT_RATE_LIMIT_MAX_MESSAGES, CHAT_RATE_LIMIT_WINDOW_SECONDS,
+    STATIC_CACHE_CONTROL,
 )
 from core.personality import Personality
 from core.brain import agent, process
 from agent.schemas import AgentState
 from core.memory import load_conversation, load_facts, clear_conversation
-from core.relationship import load_relationship
+from core.memory import load_relationship
 from core.reminders import (
     add_reminder, list_reminders, delete_reminder, clear_reminders,
 )
-from core.time_parser import parse_time
+from core.reminders import parse_time
 from core.system_status import get_status
 from core.tts_service import synthesize
 from core.action_service import run_action
-from integrations.background_events import broadcast_status, watch_reminders
-from integrations.connection_manager import ConnectionManager
+from integrations.events import broadcast_status, watch_reminders, ConnectionManager
+from integrations.webrtc_audio import (
+    close_all_audio_sessions,
+    close_audio_session,
+    create_audio_session,
+    finish_audio_session,
+    stream_tts_to_session,
+)
+from memory.storage import rebuild_file_index
 
 BASE_DIR = Path(__file__).resolve().parent
 MAX_MESSAGE_CHARS = 4_000
@@ -46,12 +55,13 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("ENABLE_AUTH must be True when HOST is not local-only.")
     reminder_task = asyncio.create_task(watch_reminders(manager))
     status_task = asyncio.create_task(broadcast_status(manager))
+    asyncio.create_task(asyncio.to_thread(rebuild_file_index))
 
     print(f"{ASSISTANT_NAME} web server ready.")
     if ENABLE_AUTH:
         print("Auth is ON - devices must supply the API token to connect.")
     else:
-        print("⚠️  Auth is OFF - anyone on your network can use this. Set ENABLE_AUTH = True in config.py.")
+        print("WARNING: Auth is OFF - anyone on your network can use this. Set ENABLE_AUTH = True in config.py.")
 
     yield
 
@@ -63,6 +73,7 @@ async def lifespan(app: FastAPI):
             await t
         except asyncio.CancelledError:
             pass
+    await close_all_audio_sessions()
 
 
 app = FastAPI(title=f"{ASSISTANT_NAME} Web", lifespan=lifespan)
@@ -94,7 +105,7 @@ class NoCacheStaticFiles(StaticFiles):
 
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
         return response
 
 
@@ -291,39 +302,122 @@ async def api_tts(request: Request):
     url = await synthesize(text)
     return {"audio_url": url}
 
+
+@app.post("/api/webrtc/offer")
+async def api_webrtc_offer(request: Request):
+    require_token(request)
+    try:
+        return await create_audio_session(await request.json())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/api/webrtc/{session_id}")
+async def api_webrtc_close(session_id: str, request: Request):
+    require_token(request)
+    await close_audio_session(session_id)
+    return {"status": "closed"}
+
+
+def _speech_segments(buffer: str, final: bool = False) -> tuple[list[str], str]:
+    segments = []
+    start = 0
+    for index, character in enumerate(buffer):
+        if character in ".!?。！？" and (
+            index + 1 == len(buffer) or buffer[index + 1].isspace()
+        ):
+            segment = buffer[start:index + 1].strip()
+            if segment:
+                segments.append(segment)
+            start = index + 1
+        elif index - start >= 180 and character.isspace():
+            segment = buffer[start:index].strip()
+            if segment:
+                segments.append(segment)
+            start = index + 1
+
+    remaining = buffer[start:]
+    if final and remaining.strip():
+        segments.append(remaining.strip())
+        remaining = ""
+    return segments, remaining
+
+
 # =
 # 🔌 WEBSOCKET: REAL-TIME CHAT + LIVE EVENTS
 # =
 
-async def handle_chat_message(text: str):
+async def handle_chat_message(text: str, audio_session_id: str | None = None):
     await manager.broadcast({"type": "user_message", "text": text})
     agent.conversation.update(state=AgentState.THINKING)
     await broadcast_agent_state()
 
     stream_started = False
+    speech_started = False
+    speech_buffer = ""
+    speech_queue: asyncio.Queue[str | None] = asyncio.Queue()
+    speech_task = None
+
+    if audio_session_id:
+        async def synthesize_queued_speech():
+            nonlocal speech_started
+            while True:
+                segment = await speech_queue.get()
+                if segment is None:
+                    return
+                try:
+                    streamed = await stream_tts_to_session(audio_session_id, segment)
+                    if streamed and not speech_started:
+                        speech_started = True
+                        await manager.broadcast({
+                            "type": "webrtc_audio_started",
+                            "session_id": audio_session_id,
+                        })
+                except Exception as error:
+                    print("WebRTC TTS error:", error)
+
+        speech_task = asyncio.create_task(synthesize_queued_speech())
 
     async def on_chunk(chunk: str):
-        nonlocal stream_started
+        nonlocal stream_started, speech_buffer
         if not chunk:
             return
         if not stream_started:
             await manager.broadcast({"type": "response_start", "text": ""})
             stream_started = True
         await manager.broadcast({"type": "response_chunk", "text": chunk})
+        if speech_task:
+            speech_buffer += chunk
+            segments, speech_buffer = _speech_segments(speech_buffer)
+            for segment in segments:
+                speech_queue.put_nowait(segment)
 
     try:
         async with chat_lock:
             reply = await process(text, personality, on_chunk=on_chunk)
     except asyncio.CancelledError:
+        if speech_task:
+            speech_task.cancel()
+        if audio_session_id:
+            finish_audio_session(audio_session_id)
         agent.conversation.update(state=AgentState.IDLE)
         await broadcast_agent_state()
         raise
 
+    if speech_task:
+        segments, speech_buffer = _speech_segments(speech_buffer, final=True)
+        for segment in segments:
+            speech_queue.put_nowait(segment)
+        speech_queue.put_nowait(None)
+        await speech_task
+        finish_audio_session(audio_session_id)
+
     audio_url = None
-    try:
-        audio_url = await synthesize(reply)
-    except Exception as e:
-        print("TTS error:", e)
+    if not speech_started:
+        try:
+            audio_url = await synthesize(reply)
+        except Exception as e:
+            print("TTS error:", e)
 
     if stream_started:
         await manager.broadcast({
@@ -371,6 +465,9 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
 
             if msg_type == "chat":
                 text = (data.get("text") or "").strip()
+                audio_session_id = data.get("audio_session_id")
+                if not isinstance(audio_session_id, str):
+                    audio_session_id = None
                 if not text:
                     continue
                 if len(text) > MAX_MESSAGE_CHARS:
@@ -382,9 +479,11 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
                     continue
 
                 cancel_active_chat_tasks()
-                task = asyncio.create_task(handle_chat_message(text))
+                task = asyncio.create_task(handle_chat_message(text, audio_session_id))
                 active_chat_tasks.add(task)
                 task.add_done_callback(active_chat_tasks.discard)
+
+
 
             elif msg_type == "cancel":
                 cancelled = cancel_active_chat_tasks()
@@ -426,7 +525,7 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(default
 
 if __name__ == "__main__":
     import uvicorn
-    from core.server_control import register_server
+    import webbrowser
 
     # Windows' default ProactorEventLoop logs a noisy (harmless)
     # "ConnectionResetError ... _call_connection_lost" traceback whenever
@@ -444,4 +543,24 @@ if __name__ == "__main__":
     uv_server = uvicorn.Server(uv_config)
     register_server(uv_server)
 
-    asyncio.run(uv_server.serve())
+    async def serve_and_open_dashboard():
+        serve_task = asyncio.create_task(uv_server.serve())
+        while not uv_server.started and not serve_task.done():
+            await asyncio.sleep(0.1)
+
+        if uv_server.started:
+            browser_host = HOST if HOST not in {"0.0.0.0", "::"} else "127.0.0.1"
+            if ":" in browser_host:
+                browser_host = f"[{browser_host}]"
+            dashboard_url = f"http://{browser_host}:{PORT}"
+            print(f"Opening Shadow dashboard: {dashboard_url}")
+            try:
+                opened = await asyncio.to_thread(webbrowser.open, dashboard_url)
+                if not opened:
+                    print("Could not open a browser automatically. Use the URL above.")
+            except webbrowser.Error as error:
+                print(f"Could not open a browser automatically: {error}")
+
+        await serve_task
+
+    asyncio.run(serve_and_open_dashboard())
