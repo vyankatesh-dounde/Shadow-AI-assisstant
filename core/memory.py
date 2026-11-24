@@ -1,7 +1,17 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from memory.storage import (
+    load_conversation as _db_load_conversation,
+    append_message as _db_append_message,
+    clear_conversation as _db_clear_conversation,
+    get_kv,
+    set_kv,
+)
 from typing import Any, Iterable, Optional
+import random
+import time
+from datetime import date, datetime as dt, timedelta, timezone
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEMORY_DIR = BASE_DIR / "memory"
@@ -10,6 +20,11 @@ MEMORY_DIR.mkdir(exist_ok=True)
 CONVO_FILE = MEMORY_DIR / "conversation.json"
 FACTS_FILE = MEMORY_DIR / "facts.json"
 PREFERENCES_FILE = MEMORY_DIR / "preferences.json"
+
+WAKE_WORDS = [
+    "hey shadow", "shadow", "हे शॅडो", "हाय शॅडो", "शॅडो"
+]
+ACKNOWLEDGMENTS = ["हो, सांगा.", "बोला.", "मी ऐकत आहे.", "काय मदत हवी?"]
 
 # Keep the existing conversation contract so the rest of Shadow remains compatible.
 MAX_TURNS = 6
@@ -27,13 +42,7 @@ MAX_TURNS = 6
 # =========================================================
 
 def load_conversation() -> list[dict]:
-    if CONVO_FILE.exists():
-        try:
-            data = json.loads(CONVO_FILE.read_text(encoding="utf-8"))
-            return data if isinstance(data, list) else []
-        except Exception:
-            return []
-    return []
+    return _db_load_conversation()
 
 
 def save_conversation(convo: list[dict]) -> None:
@@ -50,21 +59,17 @@ def save_conversation(convo: list[dict]) -> None:
         clean.append({"role": role, "content": content})
 
     clean = clean[-MAX_TURNS * 2:]
-    CONVO_FILE.write_text(
-        json.dumps(clean, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    _db_clear_conversation()
+    for msg in clean:
+        _db_append_message(msg["role"], msg["content"])
 
 
 def add_message(role: str, content: str) -> None:
-    convo = load_conversation()
-    convo.append({"role": role, "content": content})
-    save_conversation(convo)
+    _db_append_message(role, content)
 
 
 def clear_conversation() -> None:
-    if CONVO_FILE.exists():
-        CONVO_FILE.unlink()
+    _db_clear_conversation()
 
 
 # =========================================================
@@ -188,13 +193,7 @@ def _remove_matching(items: Iterable[str], value: str) -> tuple[list[str], list[
 
 
 def load_facts() -> dict:
-    if not FACTS_FILE.exists():
-        return {}
-
-    try:
-        raw = json.loads(FACTS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    raw = get_kv("facts", {})
 
     if not isinstance(raw, dict):
         return {}
@@ -229,35 +228,23 @@ def load_facts() -> dict:
         else:
             facts.pop("like", None)
 
-    # Persist cleanup when the on-disk representation differs.
     if facts != raw:
-        _write_facts(facts)
+        set_kv("facts", facts)
 
     return facts
 
 
 def _write_facts(facts: dict) -> None:
-    FACTS_FILE.write_text(
-        json.dumps(facts, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    set_kv("facts", facts)
 
 
 def load_preferences() -> dict:
-    if not PREFERENCES_FILE.exists():
-        return {}
-    try:
-        value = json.loads(PREFERENCES_FILE.read_text(encoding="utf-8"))
-        return value if isinstance(value, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    value = get_kv("preferences", {})
+    return value if isinstance(value, dict) else {}
 
 
 def _write_preferences(preferences: dict) -> None:
-    PREFERENCES_FILE.write_text(
-        json.dumps(preferences, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    set_kv("preferences", preferences)
 
 
 def _record_preference(key: str, value: str, source: str, active: bool) -> None:
@@ -360,3 +347,75 @@ def remove_favorite_if_matches(value: Any) -> Optional[str]:
         return favorite
 
     return None
+
+
+def update_relationship(text: str) -> dict:
+    data = load_relationship()
+    score = 0
+    lower = text.lower()
+    if "thank" in lower:
+        score += 2
+    if "good job" in lower or "nice" in lower:
+        score += 2
+    if "i like you" in lower:
+        score += 4
+    if "i am sad" in lower or "i'm sad" in lower:
+        score += 3
+    if "i am stressed" in lower:
+        score += 3
+    data["points"] = data.get("points", 0) + score
+    if data["points"] > 20:
+        data["level"] = 2
+    if data["points"] > 50:
+        data["level"] = 3
+    if data["points"] > 100:
+        data["level"] = 4
+    if data["points"] > 200:
+        data["level"] = 5
+    set_kv("relationship", data)
+    return data
+
+
+def load_relationship() -> dict:
+    data = get_kv("relationship", {"level": 1, "points": 0, "last_interaction": None})
+    return data if isinstance(data, dict) else {"level": 1, "points": 0, "last_interaction": None}
+
+
+def is_wake_word(text: str) -> bool:
+    return text.strip().lower().rstrip("!?.") in WAKE_WORDS
+
+
+def handle_wake_word(text: str) -> str:
+    del text
+    state = get_kv("wake_state", {})
+    if not isinstance(state, dict):
+        state = {}
+    today = date.today().isoformat()
+    if state.get("last_greeted_date") != today:
+        state["last_greeted_date"] = today
+        set_kv("wake_state", state)
+        hour = dt.now().hour
+        part = "शुभ सकाळ" if hour < 12 else ("शुभ दुपार" if hour < 18 else "शुभ संध्याकाळ")
+        return f"{part}. सांगा, काय मदत हवी?"
+    return random.choice(ACKNOWLEDGMENTS)
+
+
+def save_daily_summary(conversation: list[dict]) -> None:
+    if not conversation:
+        return
+    summary = "We talked about " + ", ".join(
+        msg["content"][:25] for msg in conversation if msg.get("role") == "user"
+    )
+    data = get_kv("daily_memory", {})
+    if not isinstance(data, dict):
+        data = {}
+    data[date.today().isoformat()] = {"summary": summary, "timestamp": time.time()}
+    set_kv("daily_memory", data)
+
+
+def load_daily_summary(day: str | None = None) -> dict | None:
+    data = get_kv("daily_memory", {})
+    if not isinstance(data, dict):
+        return None
+    record = data.get(day or date.today().isoformat())
+    return record if isinstance(record, dict) else None

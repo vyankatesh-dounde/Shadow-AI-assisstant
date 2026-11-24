@@ -1,11 +1,11 @@
 import asyncio
 import json
 
-import requests
-from config import OLLAMA_URL, OLLAMA_MODEL
+import httpx
+from config import LLAMA_CPP_MODEL, LLAMA_CPP_URL
 
 # Canned replies ask_ai() can return when something goes wrong. brain.py
-# skips saving these into conversation.json - a small model like phi3
+# skips saving these into conversation.json - a small local model
 # will otherwise sometimes read its own past "I'm offline right now."
 # turn and try to continue/explain it instead of answering the new
 # question (this is exactly what produced the garbled "If the user
@@ -17,27 +17,33 @@ FALLBACK_REPLIES = frozenset({
 })
 
 
-def _call_ollama(payload):
-    """Blocking network call - run via asyncio.to_thread so it never
-    freezes the FastAPI event loop (and every other connected browser)
-    while Ollama is thinking."""
-    response = requests.post(OLLAMA_URL, json=payload, timeout=60, stream=payload.get("stream", False))
-    if payload.get("stream", False):
-        chunks = []
-        for line in response.iter_lines(decode_unicode=True):
-            if not line:
+_http_client = httpx.AsyncClient(
+    timeout=httpx.Timeout(60.0, connect=10.0),
+    limits=httpx.Limits(max_keepalive_connections=4, max_connections=8),
+)
+
+
+async def _iter_llama_cpp_chunks(payload):
+    """Yield content chunks from llama.cpp's OpenAI-compatible SSE stream."""
+    async with _http_client.stream("POST", LLAMA_CPP_URL, json=payload) as response:
+        response.raise_for_status()
+        async for line in response.aiter_lines():
+            line = line.strip()
+            if not line.startswith("data:"):
                 continue
+            data_line = line[len("data:"):].strip()
+            if data_line == "[DONE]":
+                break
             try:
-                data = json.loads(line)
+                data = json.loads(data_line)
             except json.JSONDecodeError:
                 continue
-            text_piece = data.get("response", "")
-            if text_piece:
-                chunks.append(text_piece)
-            if data.get("done"):
-                break
-        return "".join(chunks)
-    return response.json()
+            choices = data.get("choices", [])
+            if not choices:
+                continue
+            content = choices[0].get("delta", {}).get("content")
+            if isinstance(content, str) and content:
+                yield content
 
 
 async def ask_ai(text, personality, facts, conversation, on_chunk=None):
@@ -53,77 +59,48 @@ Rules:
 - Keep responses short unless asked for detail.
 - For math or facts, respond with just the answer.
 - Sound natural, like a real assistant (similar to JARVIS).
+- Understand Marathi and Romanized Marathi, and always reply in Marathi using Devanagari script, even when the user writes in English.
+- Keep code, URLs, names, and technical identifiers unchanged when needed.
 Never continue the conversation yourself.
 Never generate follow-up questions unless asked.
 Adjust response length based on question.
 {personality.build_prompt()}
 """
 
-    history = ""
-
-    for msg in conversation[-12:]:
-        role = "Shadow" if msg["role"] == "assistant" else "User"
-        history += f"{role}: {msg['content']}\n"
-
-    full_prompt = f"""
-    {system_prompt}
-
-    Use conversation history when relevant.
-    Do not repeat previous answers unnecessarily.
-
-    Conversation History:
-    {history}
-
-    User: {text}
-    Shadow:
-    """
+    messages = [{
+        "role": "system",
+        "content": (
+            f"{system_prompt}\n"
+            "Use conversation history when relevant.\n"
+            "Do not repeat previous answers unnecessarily."
+        ),
+    }]
+    for msg in conversation[-6:]:
+        role = "assistant" if msg["role"] == "assistant" else "user"
+        content = msg["content"]
+        if isinstance(content, str):
+            messages.append({"role": role, "content": content[-1000:]})
+    messages.append({"role": "user", "content": text})
 
     payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": full_prompt,
+        "model": LLAMA_CPP_MODEL,
+        "messages": messages,
         "stream": True,
     }
 
     try:
         if on_chunk is None:
-            data = await asyncio.to_thread(_call_ollama, payload)
-            reply = data.get("response", "") if isinstance(data, dict) else str(data or "")
+            reply = "".join([chunk async for chunk in _iter_llama_cpp_chunks(payload)])
         else:
-            response = requests.post(OLLAMA_URL, json=payload, timeout=60, stream=True)
-            response.raise_for_status()
             buffer = []
-            for line in response.iter_lines(decode_unicode=True):
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                text_piece = data.get("response", "")
-                if not text_piece:
-                    continue
+            async for text_piece in _iter_llama_cpp_chunks(payload):
                 buffer.append(text_piece)
-                on_chunk(text_piece)
-                if data.get("done"):
-                    break
+                result = on_chunk(text_piece)
+                if asyncio.iscoroutine(result):
+                    await result
             reply = "".join(buffer)
 
         reply = reply.strip()
-
-        # 🚫 BLOCK PROMPT INJECTION / GARBAGE
-        bad_patterns = [
-            "your task is",
-            "embody",
-            "you must",
-            "instruction",
-            "---",
-            "relationship level",   # leaked from our own injected context
-            "the user asks",
-            ]
-
-        for pattern in bad_patterns:
-            if pattern in reply.lower():
-                return "Something went wrong. Please try again."
 
         # REMOVE CHAT LEAKS
         for stop_word in ["User:", "Shadow:"]:

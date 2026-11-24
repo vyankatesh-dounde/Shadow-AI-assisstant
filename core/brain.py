@@ -4,8 +4,11 @@ import re
 
 from agent.agent import Agent
 from ai.llm import ask_ai, FALLBACK_REPLIES
-from core.file_indexer import open_indexed, build_index
-from core.relationship import update_relationship, load_relationship
+from core.desktop_control import open_indexed, build_index
+from core.memory import (
+    add_message, load_facts, load_conversation, save_fact, save_fact_list,
+    update_relationship, load_relationship, is_wake_word, handle_wake_word,
+)
 from core.desktop_control import (
     open_app, open_smart, open_website, open_path,
     open_named_folder, open_drive,
@@ -13,12 +16,9 @@ from core.desktop_control import (
     close_window, volume_up, volume_down,
 )
 from core.skills import handle_skills
-from core.reminder_nlp import try_create_reminder
-from core.wake_word import is_wake_word, handle_wake_word
-from core.memory import add_message, load_facts, load_conversation, save_fact, save_fact_list
+from core.reminders import try_create_reminder
 from core.memory_extractor import ai_extract_memory
-from core.maps_search import search_places_and_format
-from core.web_search import search_and_format
+from core.discovery import search_places_and_format, search_and_format
 from integrations.memory_integration import (
     learn_from_text,
     fact_ack,
@@ -258,24 +258,28 @@ async def process(text, personality, on_chunk=None):
     # =========================================================
     # 🧠 STEP 2 — LEARN FROM USER
     # =========================================================
-    changes = learn_from_text(text)
+    changes = await asyncio.to_thread(learn_from_text, text)
 
-    rel = update_relationship(text)
-    facts = load_facts()
-    conversation = load_conversation()
+    rel = await asyncio.to_thread(update_relationship, text)
+    facts = await asyncio.to_thread(load_facts)
+    conversation = await asyncio.to_thread(load_conversation)
 
     # =========================================================
     # ⚡ STEP 3 — COMMAND ROUTER
     # =========================================================
-    for command in COMMANDS:
-        # Search, indexing, and desktop automation are blocking OS work.
-        # Keep them off the FastAPI event loop.
-        reply = await asyncio.to_thread(command, text, lower, facts)
-        if reply is not None:
-            add_message("user", text)
-            add_message("assistant", reply)
-            remember_today(load_conversation())
-            return reply
+    def run_command_loop():
+        for command in COMMANDS:
+            reply = command(text, lower, facts)
+            if reply is not None:
+                return reply
+        return None
+
+    reply = await asyncio.to_thread(run_command_loop)
+    if reply is not None:
+        add_message("user", text)
+        add_message("assistant", reply)
+        remember_today(load_conversation())
+        return reply
 
     # =========================================================
     # 📝 STEP 3.5 — QUICK FACT ACK
@@ -291,10 +295,12 @@ async def process(text, personality, on_chunk=None):
     # 🤖 STEP 4 — LLM FALLBACK
     # =========================================================
     if len(text.split()) >= 4:
-        memory = await ai_extract_memory(text, personality)
-        if memory:
-            _store_ai_extracted_memory(memory)
-            facts = load_facts()
+        async def extract_memory_in_background():
+            memory = await ai_extract_memory(text, personality)
+            if memory:
+                _store_ai_extracted_memory(memory)
+
+        asyncio.create_task(extract_memory_in_background())
 
     level = rel.get("level", load_relationship().get("level", 1))
 
@@ -306,12 +312,28 @@ async def process(text, personality, on_chunk=None):
 
     memory_context = build_memory_context()
 
+    tools = agent.registry.schemas()
+    tool_hint = ""
+    tool_words = (
+        "open", "search", "find", "remind", "volume", "window",
+        "desktop", "app", "file", "folder", "switch", "close",
+        "shutdown", "restart", "sleep",
+    )
+    if any(word in lower for word in tool_words):
+        compact_tools = [
+            {"name": tool["name"], "arguments": tool.get("parameters", {})}
+            for tool in tools
+        ]
+        tool_hint = (
+            f"Registered tools: {json.dumps(compact_tools)}\n"
+            'If needed, return only JSON: {"tool":"name","arguments":{}}\n'
+        )
+
     enhanced_input = f"""
     {memory_context}
     {relationship_context}
     Agent context: {agent.context()}
-    Registered tools: {json.dumps(agent.registry.schemas())}
-    If a registered tool is needed, return only JSON in this shape: {{"tool": "name", "arguments": {{}}}}.
+    {tool_hint}
     Never invent a tool name or execute an action outside the registered tools.
     User: {text}
     """

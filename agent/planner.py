@@ -13,15 +13,15 @@ class Plan:
 
 class Planner:
     TASKS = {
-        "movie": ("book_movie", ["movie", "time", "people"]),
-        "restaurant": ("reserve_restaurant", ["restaurant", "date", "time", "people"]),
-        "food": ("order_food", ["restaurant", "items"]),
+        "movie": ("book_movie", ["movie", "time", "people"], ("book", "watch", "see")),
+        "restaurant": ("reserve_restaurant", ["restaurant", "date", "time", "people"], ("reserve", "book")),
+        "food": ("order_food", ["restaurant", "items"], ("order", "deliver", "delivery", "buy")),
     }
 
     def plan(self, text: str) -> Plan:
         lower = text.casefold()
-        for keyword, (intent, required) in self.TASKS.items():
-            if keyword in lower and any(word in lower for word in ("book", "watch", "reserve", "order", "eat")):
+        for keyword, (intent, required, triggers) in self.TASKS.items():
+            if keyword in lower and any(re.search(rf"\b{trigger}\b", lower) for trigger in triggers):
                 slots: dict[str, Any] = {}
                 if "tonight" in lower:
                     slots["date"] = "tonight"

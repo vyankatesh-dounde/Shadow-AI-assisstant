@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 static/audio/*.mp3
 memory/file_index.json
+memory/shadow.db*

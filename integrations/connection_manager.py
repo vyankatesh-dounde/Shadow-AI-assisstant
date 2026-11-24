@@ -1,5 +1,6 @@
 """Connection layer: manage browser and future device WebSocket connections."""
 
+import asyncio
 from fastapi import WebSocket
 
 
@@ -17,10 +18,13 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict):
         disconnected = []
-        for websocket in self.active:
+        async def send(websocket: WebSocket):
             try:
                 await websocket.send_json(message)
             except Exception:
                 disconnected.append(websocket)
+
+        if self.active:
+            await asyncio.gather(*(send(websocket) for websocket in tuple(self.active)))
         for websocket in disconnected:
             self.disconnect(websocket)

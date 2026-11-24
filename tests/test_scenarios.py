@@ -48,6 +48,34 @@ class ConversationScenarioTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.agent.conversation.state.active_task)
         self.assertEqual(self.agent.conversation.state.state, AgentState.IDLE)
 
+    async def test_food_question_is_not_misclassified_as_an_order(self):
+        async def fallback():
+            return "Fast food is not inherently unhealthy."
+
+        self.assertEqual(
+            await self.agent.handle("is fast food bad to eat", fallback),
+            "Fast food is not inherently unhealthy.",
+        )
+        self.assertIsNone(self.agent.conversation.state.active_task)
+
+    async def test_new_question_interrupts_pending_food_task(self):
+        searches = []
+        self.agent.tasks.start("order_food", "food", {"restaurant": "any restaurant"})
+        self.agent.tasks.set_question("What would you like to order?")
+        self.agent.registry.require("search_food_options").handler = (
+            lambda **arguments: searches.append(arguments) or "search result"
+        )
+
+        async def fallback():
+            return "Fast food is not inherently unhealthy."
+
+        self.assertEqual(
+            await self.agent.handle("I asked that is the fast food bad to eat", fallback),
+            "Fast food is not inherently unhealthy.",
+        )
+        self.assertEqual(searches, [])
+        self.assertIsNone(self.agent.conversation.state.active_task)
+
     async def test_tool_failure_is_recoverable(self):
         def broken_tool():
             raise RuntimeError("provider offline")

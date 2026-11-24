@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from .schemas import ConversationState
+from memory.storage import get_kv, set_kv
 
 
 class ConversationManager:
@@ -13,6 +14,12 @@ class ConversationManager:
         self.state = self._load()
 
     def _load(self) -> ConversationState:
+        value = get_kv("agent_state", {})
+        if isinstance(value, dict):
+            try:
+                return ConversationState.from_dict(value)
+            except (TypeError, ValueError, AttributeError):
+                pass
         try:
             value = json.loads(self.state_file.read_text(encoding="utf-8"))
             return ConversationState.from_dict(value)
@@ -20,10 +27,7 @@ class ConversationManager:
             return ConversationState()
 
     def save(self) -> None:
-        self.state_file.write_text(
-            json.dumps(self.state.to_dict(), indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        set_kv("agent_state", self.state.to_dict())
 
     def reset(self) -> None:
         self.state = ConversationState()

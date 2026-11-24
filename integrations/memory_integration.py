@@ -1,10 +1,7 @@
 from datetime import date, timedelta
 from core.memory import load_facts
 from core.memory_extractor import extract_and_store, build_fact_ack
-from integrations.daily_memory import (
-    load_daily_summary,
-    save_daily_summary as _save_daily_summary,
-)
+from core.memory import load_daily_summary, save_daily_summary as _save_daily_summary
 
 
 # =========================================================

@@ -7,6 +7,7 @@ from typing import Any
 from .confirmation import clear_confirmation, request_confirmation
 from .schemas import AgentState, PermissionLevel, ToolRequest, ToolResult
 from .tool_registry import ToolRegistry
+from memory.storage import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class ToolExecutor:
             "result": result.message,
             "error": result.error,
         }
+        log_action(record)
         with self.log_file.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
 

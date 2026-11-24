@@ -1,6 +1,6 @@
 # Shadow AI
 
-Shadow is a locally hosted Windows assistant that runs on your PC and is controlled from a browser on the same network. It combines voice input, wake-word trigger, local LLM responses via Ollama, reminders, browser TTS, and Windows desktop automation in one project.
+Shadow is a locally hosted Windows assistant that runs on your PC and is controlled from a browser on the same network. It combines voice input, wake-word trigger, local LLM responses via llama.cpp, reminders, browser TTS, and Windows desktop automation in one project.
 
 ## Overview
 
@@ -8,7 +8,7 @@ Shadow is designed to feel like a lightweight local personal assistant:
 
 - It runs entirely on your own machine.
 - It can be opened from any browser on your home network.
-- It uses a local model through Ollama instead of a cloud-only AI backend.
+- It uses a local model through llama.cpp instead of a cloud-only AI backend.
 - It can understand quick commands, open apps, manage reminders, search the web, and perform basic desktop actions.
 
 This project is meant to be simple and self-hosted, with a clean split between UI, logic, and connection layers.
@@ -16,12 +16,13 @@ This project is meant to be simple and self-hosted, with a clean split between U
 ## Key Features
 
 - Browser-based dashboard with voice input and wake-word activation
-- Local LLM chat using Ollama
+- Low-latency WebRTC audio playback with sentence-level speech streaming
+- Local LLM chat using llama.cpp and its OpenAI-compatible API
 - Reminder parsing and background reminder checking
 - Memory and fact extraction for recurring user context
 - Windows desktop control for app/window/volume/power actions
 - Map-based restaurant and movie-theater discovery with available contact details
-- TTS response playback in the browser
+- Japanese male TTS response playback in the browser using Edge TTS
 - LAN accessibility from phone, tablet, or laptop
 - Authenticated API token protection for trusted local use
 
@@ -42,7 +43,7 @@ flowchart LR
     subgraph Function[Function Layer]
         Brain[core/brain.py\nmessage routing]
         Agent[agent/\nconversation + tasks + planning]
-        AI[ai/llm.py\nOllama model calls]
+        AI[ai/llm.py\nllama.cpp model calls]
         Memory[core/memory.py\nconversation + facts]
         Reminders[core/reminders.py\nreminder logic]
         Desktop[core/desktop_control.py\nWindows actions]
@@ -86,7 +87,7 @@ This is the brain of the project. It contains reusable functions for:
 - message classification and command routing in `core/brain.py`
 - AI generation in `ai/llm.py`
 - memory storage and recall in `core/memory.py`
-- reminder parsing and polling in `core/reminders.py` and `core/time_parser.py`
+- reminder parsing and polling in `core/reminders.py`
 - desktop operations in `core/desktop_control.py`
 - quick-answer skills in `core/skills.py`
 - system status gathering in `core/system_status.py`
@@ -138,7 +139,7 @@ This layer acts as the bridge between the browser and the function layer.
 
 ### Reminder flow
 1. The user creates a reminder in the dashboard.
-2. The reminder text is parsed by `core/time_parser.py`.
+2. The reminder text is parsed by `core/reminders.py`.
 3. The due reminder is stored in memory.
 4. Background polling checks for due reminders.
 5. When triggered, the reminder is broadcast to connected clients and spoken aloud.
@@ -157,9 +158,8 @@ Shadow-AI/
 ├── config.py                 # Host, port, token, assistant settings
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # Project overview and setup
-├── ARCHITECTURE.md           # Architecture notes
 ├── ai/
-│   └── llm.py                # Ollama-backed LLM interaction
+│   └── llm.py                # llama.cpp-backed LLM interaction
 ├── agent/
 │   ├── agent.py              # Agent orchestration and task continuation
 │   ├── conversation.py       # Persistent agent state
@@ -174,32 +174,25 @@ Shadow-AI/
 │   ├── brain.py              # Core command and response routing
 │   ├── desktop_control.py    # Windows desktop automation
 │   ├── file_indexer.py       # Local file indexing/search support
-│   ├── maps_search.py         # Read-only OpenStreetMap place lookup
-│   ├── memory.py             # Conversation and fact memory
-│   ├── memory_extractor.py   # Memory extraction logic
+│   ├── discovery.py           # Web and place discovery
+│   ├── memory.py              # Conversation, facts, relationship, wake state
+│   ├── memory_extractor.py    # Deterministic and LLM memory extraction
 │   ├── math_engine.py        # Math helpers
 │   ├── personality.py        # Assistant tone/personality
-│   ├── reminders.py          # Reminder management
-│   ├── reminder_nlp.py       # Natural-language reminder parsing helpers
-│   ├── relationship.py       # Relationship memory tracking
+│   ├── reminders.py          # Reminder management, NLP, and time parsing
 │   ├── server_control.py     # Stop the server process safely
 │   ├── skills.py             # Quick-answer skills and commands
 │   ├── system_status.py      # CPU/RAM/window status collection
-│   ├── time_parser.py        # Reminder time parsing
 │   ├── tts_service.py        # Browser TTS output generation
-│   └── wake_word.py          # Wake-word detection logic
+│   └── call_book.py          # Manual contact directory
 ├── integrations/
 │   ├── background_events.py  # Background reminder/status broadcasting
 │   ├── connection_manager.py # Active websocket connection tracking
-│   ├── daily_memory.py       # Daily memory summary support
-│   └── memory_integration.py # Memory context integration
+│   ├── memory_integration.py # Memory context integration
+│   └── webrtc_audio.py       # Low-latency streamed TTS audio
 ├── memory/
-│   ├── conversation.json     # Conversation history
-│   ├── daily_memory.json     # Daily memory summaries
-│   ├── facts.json            # Stored facts
-│   ├── relationship.json     # Relationship/context records
-│   ├── reminders.json        # Stored reminders
-│   └── wake_state.json       # Wake state data
+│   ├── shadow.db             # SQLite WAL storage
+│   └── storage.py            # Schema, migration, and storage helpers
 ├── static/
 │   ├── index.html            # Dashboard shell
 │   ├── css/
@@ -218,13 +211,22 @@ Shadow-AI/
 pip install -r requirements.txt
 ```
 
-### 2. Make sure Ollama is available
+The dashboard uses WebRTC for streamed response audio. Browser-based speech
+recognition remains unchanged.
 
-Shadow expects a local Ollama instance with a model available, typically `phi3`.
+### 2. Start the llama.cpp server
+
+Download a compatible Qwen3.5 2B Q4_K_M GGUF model and start `llama-server`
+with that model. Shadow expects the OpenAI-compatible chat-completions API at
+`http://localhost:8080/v1/chat/completions`.
 
 ```bash
-ollama pull phi3
+llama-server -m path/to/Qwen3.5-2B-Q4_K_M.gguf --host 127.0.0.1 --port 8080 --ctx-size 8192
 ```
+
+The configured model ID is `Qwen3.5-2B-Q4_K_M` and can be changed alongside
+`LLAMA_CPP_URL` in `config.py` if your server uses a different model name or
+endpoint.
 
 ### 3. Configure the access token
 
@@ -277,7 +279,7 @@ Possible next improvements include:
 
 ## Call Book
 
-Add manual contacts to `memory/call_book.json`:
+Add manual contacts through the SQLite `call_book` key in `memory/shadow.db`, or add a legacy `memory/call_book.json` once before startup so the migration imports it:
 
 ```json
 {
@@ -310,4 +312,4 @@ for confirmation before opening the phone link.
 
 ## Summary
 
-Shadow is a practical local assistant project built around a clear three-layer design: UI, functional intelligence, and networked backend coordination. It is intentionally simple, runs on Windows, uses Ollama for local AI, and is designed to be accessible from any browser on the same network while keeping the core logic local and controllable.
+Shadow is a practical local assistant project built around a clear three-layer design: UI, functional intelligence, and networked backend coordination. It is intentionally simple, runs on Windows, uses llama.cpp for local AI, and is designed to be accessible from any browser on the same network while keeping the core logic local and controllable.

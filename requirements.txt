@@ -4,9 +4,11 @@ uvicorn[standard]
 
 # Local AI and HTTP calls
 requests
+httpx
 
 # Text-to-speech
 edge-tts
+aiortc
 
 # Windows desktop automation and status monitoring
 pyautogui
